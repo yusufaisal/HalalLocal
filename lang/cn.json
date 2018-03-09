@@ -1,0 +1,80 @@
+{
+  "lang":"cn",
+  "alert": {
+    "nointernet": "无网络连接",
+    "nolocation": "请在 '设置' 中授予位置许可",
+    "noresto": "没有找到清真餐厅",
+    "noprayerspace": "找不到祈祷的地方",
+    "nogps": "没有打开GPS",
+    "offelectronic": "远离其他的电子设备"
+  },
+  "prayer": {
+    "date": "日期",
+    "fajr": "黎明",
+    "dhuhr": "背部",
+    "asr": "年龄",
+    "maghrib": "傍晚",
+    "isha": "伊沙",
+    "now": "现在",
+    "hour": "小时",
+    "minute": "分钟",
+    "until": "一直到",
+    "jan": "一月",
+    "feb": "二月",
+    "mar": "三月",
+    "apr": "四月",
+    "may": "五月",
+    "jun": "六月",
+    "jul": "七月",
+    "aug": "八月",
+    "sep": "九月",
+    "oct": "十月",
+    "nov": "十一月",
+    "dec": "十二月"
+  },
+  "list": {
+    "distance": "距离",
+    "km": "千米",
+    "source": "资源",
+    "tapdirection": "点击方向",
+    "nearestprayerspace": "最近的祈祷地点",
+    "more": "更多",
+    "done": "完",
+    "month": "月",
+    "year": "年",
+    "open": "现在开门了",
+    "closed": "现在关闭",
+    "open_na": "开放时间不可用"
+  },
+  "menu": {
+    "trip": "旅行",
+    "tripsub": "在这里获得清真之旅和umrah优惠",
+    "prayerspace": "祈祷地点",
+    "prayerspacesub": "搜索附近的祈祷地点",
+    "resto": "清真餐厅",
+    "restosub": "搜索附近的清真餐厅",
+    "prayertime": "祈祷时间",
+    "prayertimesub": "不管在哪，准时祈祷",
+    "qibla": "朝拜",
+    "qiblasub": "朝拜发现者",
+    "info": "旅游提示",
+    "infosub": "搜索更多有关清真旅游的信息",
+    "feedback": "反馈",
+    "feedbacksub": "给我们提供反馈，帮助我们做得更好",
+    "feedbacktext": "任何反馈？ 告诉我们！",
+    "feedbackthanks": "感谢您的反馈意见！"
+  },
+  "notif": {
+    "getloc": "正在搜索位置",
+    "getkeywordprayerspace": "正在通过关键字搜索祈祷地点",
+    "getpointprayerspace": "正在通过重点搜索祈祷地点",
+    "getkeywordresto": "正在通过关键字搜索清真餐厅",
+    "getpointresto": "正在通过重点搜索清真餐厅",
+    "finishprayerspace": "完成加载{length}附近的祷告空间",
+    "finishresto": "已完成{length}附近的餐馆加载",
+    "loading": "正在加载"
+  },
+  "qibla": {
+    "degree": "程度"
+  }
+}

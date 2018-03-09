@@ -1,0 +1,80 @@
+{
+  "lang":"en",
+  "alert": {
+    "nointernet": "No internet connection",
+    "nolocation": "Please grant location permission for Halal Local through Setting (manual)",
+    "noresto": "Nearby muslim friendly resto is not found",
+    "noprayerspace": "Nearby prayer space is not found",
+    "nogps": "Turn on GPS for better accuracy",
+    "offelectronic": "Keep away from other electronic devices / magnetic objects"
+  },
+  "prayer": {
+    "date": "Date",
+    "fajr": "Fajr",
+    "dhuhr": "Dhuhr",
+    "asr": "Asr",
+    "maghrib": "Maghrib",
+    "isha": "Isha",
+    "now": "Now",
+    "hour": "hour(s)",
+    "minute": "minute(s)",
+    "until": "until",
+    "jan": "January",
+    "feb": "February",
+    "mar": "March",
+    "apr": "April",
+    "may": "May",
+    "jun": "June",
+    "jul": "July",
+    "aug": "August",
+    "sep": "September",
+    "oct": "October",
+    "nov": "November",
+    "dec": "December"
+  },
+  "list": {
+    "distance": "Distance",
+    "km": "km",
+    "source": "Source",
+    "tapdirection": "Tap for direction",
+    "nearestprayerspace": "Nearest mosque",
+    "more": "More",
+    "done": "Done",
+    "month": "Month",
+    "year": "Year",
+    "open": "Open now",
+    "closed": "Closed now",
+    "open_na": "Opening hours N/A"
+  },
+  "menu": {
+    "trip": "Trip and Umrah",
+    "tripsub": "Get halal trip and umrah deals here",
+    "prayerspace": "Prayer Space",
+    "prayerspacesub": "Find nearby prayer spaces",
+    "resto": "Muslim Friendly Resto",
+    "restosub": "Find nearby resto and market",
+    "prayertime": "Prayer Time",
+    "prayertimesub": "Praying on time wherever you are",
+    "qibla": "Qibla",
+    "qiblasub": "Qibla finder",
+    "info": "Traveling Tips",
+    "infosub": "Find out more about halal tourism",
+    "feedback": "Feedback",
+    "feedbacksub": "Suggest us for the better Halal Local",
+    "feedbacktext": "Any feedback? Tell us!",
+    "feedbackthanks": "Thank you for your feedback!"
+  },
+  "notif": {
+    "getloc": "Getting location",
+    "getkeywordprayerspace": "Getting prayer spaces by keywords",
+    "getpointprayerspace": "Getting prayer spaces by points",
+    "getkeywordresto": "Getting restaurants by keywords",
+    "getpointresto": "Getting restaurants by points",
+    "finishprayerspace": "Finished loading {length} nearby prayer spaces",
+    "finishresto": "Finished loading {length} nearby restaurants",
+    "loading": "Loading"
+  },
+  "qibla": {
+    "degree": "Degree"
+  }
+}

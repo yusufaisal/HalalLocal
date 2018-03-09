@@ -1,0 +1,81 @@
+{
+  "lang":"id",
+  "alert": {
+    "nointernet": "Anda tidak terhubung pada internet",
+    "nolocation": "Mohon aktifkan akses lokasi untuk Halal Local melalui Setting (manual)",
+    "noresto": "Tidak ditemukan resto ramah muslim terdekat",
+    "noprayerspace": "Tidak ditemukan masjid dan musholla terdekat",
+    "nogps": "Sebaiknya menyalakan GPS agar lebih akurat",
+    "offelectronic": "Jauhkan dari perangkat elektronik lain / benda bermagnet"
+  },
+  "prayer": {
+    "date": "Tgl",
+    "fajr": "Subuh",
+    "dhuhr": "Dhuhur",
+    "asr": "Ashar",
+    "maghrib": "Maghrib",
+    "isha": "Isya",
+    "now": "Sekarang",
+    "hour": "jam",
+    "minute": "menit",
+    "until": "hingga",
+    "jan": "Januari",
+    "feb": "Februari",
+    "mar": "Maret",
+    "apr": "April",
+    "may": "Mei",
+    "jun": "Juni",
+    "jul": "Juli",
+    "aug": "Agustus",
+    "sep": "September",
+    "oct": "Oktober",
+    "nov": "November",
+    "dec": "Desember"
+
+  },
+  "list": {
+    "distance": "Jarak",
+    "km": "km",
+    "source": "Sumber",
+    "tapdirection": "Tap untuk penunjuk arah",
+    "nearestprayerspace": "Masjid terdekat",
+    "more": "Selanjutnya",
+    "done": "Selesai",
+    "month": "Bulan",
+    "year": "Tahun",
+    "open": "Saat ini buka",
+    "closed": "Saat ini tutup",
+    "open_na": "Jam buka tidak tersedia"
+  },
+  "menu": {
+    "trip": "Trip dan Umroh",
+    "tripsub": "Dapatkan promo trip dan umroh di sini",
+    "prayerspace": "Masjid dan Musholla",
+    "prayerspacesub": "Temukan masjid terdekat",
+    "resto": "Resto Ramah Muslim",
+    "restosub": "Temukan resto dan market",
+    "prayertime": "Jadwal Shalat",
+    "prayertimesub": "Shalat tepat waktu dimanapun berada",
+    "qibla": "Arah Kiblat",
+    "qiblasub": "Penunjuk arah kiblat",
+    "info": "Tips Traveling",
+    "infosub": "Kenali lebih tentang pariwisata halal",
+    "feedback": "Feedback",
+    "feedbacksub": "Saran untuk Halal Local yang lebih baik",
+    "feedbacktext": "Ada feedback? Beritahu kami!",
+    "feedbackthanks": "Terima kasih atas feedback Anda!"
+  },
+  "notif": {
+    "getloc": "Mendapatkan lokasi",
+    "getkeywordprayerspace": "Mendapatkan masjid dengan kata kunci",
+    "getpointprayerspace": "Mendapatkan masjid dengan point",
+    "getkeywordresto": "Mendapatkan resto berdasar kata kunci",
+    "getpointresto": "Mendapatkan resto berdasar point",
+    "finishprayerspace": "Selesai memuat {length} masjid terdekat",
+    "finishresto": "Selesai memuat {length} resto terdekat",
+    "loading": "Memuat"
+  },
+  "qibla": {
+    "degree": "Derajat"
+  }
+}
