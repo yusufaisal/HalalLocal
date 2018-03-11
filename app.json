@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Halal Local",
-    "icon": "./img/png/ic_launcher.png",
+    "icon": "./img/jpg/ic_launcher.png",
     "version": "4.0.0",
     "slug": "halallocal",
     "sdkVersion": "23.0.0",
@@ -12,7 +12,7 @@
     "android": {
       "package": "com.halallocal.app",
       "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "READ_EXTERNAL_STORAGE", "READ_INTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"],
-      "versionCode": 4,
+      "versionCode": 5,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyDhpUU6ghWOUsSpIkuSgPb-ov7ATjKP-2Q"

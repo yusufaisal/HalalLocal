@@ -2,6 +2,7 @@ import React from "react";
 import {Alert,
     Animated,
     AppState,
+    BackHandler,
     Dimensions,
     FlatList,
     Image,
@@ -11,13 +12,10 @@ import {Alert,
     Platform,
     ScrollView,
     Text,
-    ToastAndroid,
     TouchableWithoutFeedback,
     View,
     WebView,
-    StatusBar,
-    TouchableHighlight,
-    TouchableNativeFeedback, BackHandler } from "react-native";
+    StatusBar} from "react-native";
 import {StackNavigator} from "react-navigation";
 import {Location, MapView, Permissions} from "expo";
 import {GooglePlacesAutocomplete} from "react-native-google-places-autocomplete";
@@ -25,15 +23,10 @@ import getDirections from "react-native-google-maps-directions";
 import AppIntro from 'react-native-app-intro';
 import debounce from "lodash.debounce";
 import Carousel from 'react-native-snap-carousel';
-import { styles } from './styles/beranda';
-import { Loading } from './components/Loading';
-
-// SWIPEABLE PARALLAX CAROUSEL
 import SwipeableParallaxCarousel from 'react-native-swipeable-parallax-carousel';
 
-// // APP INTRO
-// import Intro from './components/Intro';
-// import checkIfFirstLaunch from "./utils/firstLaunchCheck";
+import {styles} from './styles/beranda';
+import {Loading} from './components/Loading';
 
 // CAROUSEL IMAGES
 const carouselImages=[
@@ -60,22 +53,33 @@ const media_url = 'http://media.halallocal.com/';
 // FEED URL
 const feed_url = 'https://goo.gl/forms/9bUMMUBD4pEQtagC3';
 
+// DEFAULT ICON FOR LIST
+const restodef = "https://maps.gstatic.com/mapfiles/place_api/icons/restaurant-71.png";
+const mosquedef = "https://maps.gstatic.com/mapfiles/place_api/icons/worship_islam-71.png";
+
 // DEVICE WIDTH AND HEIGHT
 const width = Dimensions.get('window').width;
 const height = Dimensions.get('window').height;
 
+// KEY ID FOR GOOGLE MAPS API
 const keyMap = "AIzaSyDXTkfRD1oPstyW00h3sjurP4LmDL8p-_E";
+
+// SETTINGS
 let log = "";
 let id = "";
 let lang = "en";
 let lg = require('./lang/en.json');
+
+// DATABASE LOAD
 let location, query;
 let mosque, resto, prayer, qiblat;
-const restodef = "https://maps.gstatic.com/mapfiles/place_api/icons/restaurant-71.png";
-const mosquedef = "https://maps.gstatic.com/mapfiles/place_api/icons/worship_islam-71.png";
+
+// AVOID CONCURRENT MENU OPENING
 let menuopen = true;
 let menuopen2 = true;
 
+// WATCHER FOR QIBLA
+let locationWatcher = null;
 
 // For navigation between pages purposes
 let navigate = ()=>{};
@@ -99,14 +103,14 @@ let track = (desc) => {
 
 // Send data when the log is not empty (on app started and AppState == background/inactive
 let sendData = () => {
-    if (log !== "") {
+    if (log != "") {
         // Feedback form url
         fetch("https://docs.google.com/forms/d/e/1FAIpQLSfVceOWcWNfsrY8-s5GTYTABf3Z5hIyomE-wrmVigeX07bs-Q/formResponse?entry.2030268456=" + id + "&entry.1684739681=" + encodeURI(log)).then(() => {
             // Emptying the log after uploading data
             Expo.FileSystem.writeAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/log.txt", "").then(() => {
                 log = "";
-            }).catch(err => track("!! sendData() => write: " + err.message));
-        }).catch(err => track("!! sendData() => fetch: " + err.message));
+            }).catch(err => track("!! sendData() -> write: " + err.message));
+        }).catch(err => track("!! sendData() -> fetch form: " + err.message));
     }
 };
 
@@ -142,8 +146,8 @@ let updatePrayer = (loc, time) => {
         prayer = {time: time, data: ary};
     }).catch(err => {
         // If there is no internet connection
-        track("!! updatePrayer: Check internet connection: " + err.message);
         prayer.data = -2;
+        track("!! updatePrayer() -> Check internet connection: " + err.message);
     });
 };
 
@@ -154,7 +158,6 @@ let getResto = (lat, lng, ctr) => {
         lng = query.lng;
     if (!ctr)
         ctr = query.ctr;
-    // ToastAndroid.showWithGravity('Getting nearby resto from Halal Local database...',ToastAndroid.LONG,ToastAndroid.BOTTOM);
 
     let req = lat+","+lng;
     let arry = [];
@@ -192,11 +195,11 @@ let getResto = (lat, lng, ctr) => {
                     }
                 }
                 clone[0] = clone2;
-            }).catch(err => {resto = {markers: -2, done: [false,false]};});
+            }).catch(() => {resto = {markers: -2, done: [false,false]};});
         }
         else
             clone[0] = [];
-    }).catch(err => {resto = {markers: -2, done: [false,false]};});
+    }).catch(() => {resto = {markers: -2, done: [false,false]};});
     fetch('https://spreadsheets.google.com/feeds/list/16-07sDLCbE8lA1n6KSDQi72t1bb40I32BdDPWnaxRQY/3/public/values?alt=json&sq=country="' + ctr + '" and adm2="" and locality="" and town=""').then((resp) => {
         arry[1] = JSON.parse(resp._bodyText).feed.entry;
         let clone2 = [];
@@ -223,7 +226,7 @@ let getResto = (lat, lng, ctr) => {
             }
         }
         clone[1] = clone2;
-    }).catch(err => {resto = {markers: -2, done: [false,false]};});
+    }).catch(() => {resto = {markers: -2, done: [false,false]};});
     let int = setInterval(() => {
         if (resto.markers == -2)
             clearInterval(int);
@@ -320,12 +323,12 @@ let updateResto = (Q) => {
                             }
                         };
                     }
-                }).catch(err => {
+                }).catch(() => {
                     resto = {markers: -2, done: [false, false]};
                 });
             }
             resto.done[0] = true;
-        }).catch(err => {
+        }).catch(() => {
             resto = {markers: -2, done: [false, false]};
         });
         getResto(Q.lat, Q.lng, Q.ctr);
@@ -353,7 +356,6 @@ let getMosque = (lat, lng, ctr) => {
         lng = query.lng;
     if (!ctr)
         ctr = query.ctr;
-    // ToastAndroid.showWithGravity('Getting nearby mosque from Halal Local database...',ToastAndroid.LONG,ToastAndroid.BOTTOM);
 
     let req = lat+","+lng;
     let arry = [];
@@ -391,11 +393,11 @@ let getMosque = (lat, lng, ctr) => {
                     }
                 }
                 clone[0] = clone2;
-            }).catch(err => {mosque = {markers: -2, done: [false,false]};});
+            }).catch(() => {mosque = {markers: -2, done: [false,false]};});
         }
         else
             clone[0] = [];
-    }).catch(err => {mosque = {markers: -2, done: [false,false]};});
+    }).catch(() => {mosque = {markers: -2, done: [false,false]};});
     fetch('https://spreadsheets.google.com/feeds/list/16-07sDLCbE8lA1n6KSDQi72t1bb40I32BdDPWnaxRQY/4/public/values?alt=json&sq=country="' + ctr + '" and adm2="" and locality="" and town=""').then((resp) => {
         arry[1] = JSON.parse(resp._bodyText).feed.entry;
         let clone2 = [];
@@ -422,7 +424,7 @@ let getMosque = (lat, lng, ctr) => {
             }
         }
         clone[1] = clone2;
-    }).catch(err => {mosque = {markers: -2, done: [false,false]};});
+    }).catch(() => {mosque = {markers: -2, done: [false,false]};});
     let int = setInterval(() => {
         if (mosque.markers == -2)
             clearInterval(int);
@@ -508,7 +510,7 @@ let updateMosque = (Q) => {
             };
         }
         mosque.done[0] = true;
-    }).catch(err => {mosque = {markers: -2, done: [false,false]};});
+    }).catch(() => {mosque = {markers: -2, done: [false,false]};});
 
     if (!Q.ctr || Q.ctr == "") {
         getCountry(Q.lat, Q.lng).then(ctr => {
@@ -528,7 +530,7 @@ let getCountry = (lat, lng) => {
         for (let i in data)
             if (data[i].types.indexOf("country") != -1)
                 return data[i].short_name;
-    }).catch(err => {return ""})
+    }).catch(() => "")
 };
 
 // Retrieve data for all features. Given opt-out if needed
@@ -582,31 +584,8 @@ const sliderItemHorizontalMargin = wp(1);
 const sliderWidth = viewportWidth;
 const sliderItemWidth = slideWidth + sliderItemHorizontalMargin * 2;
 
-class Start extends React.Component {
-    static navigationOptions = {
-        title: 'Start'
-    };
-
-    render() {
-        return (
-            <ScrollView>
-                <View style={styles.container}>
-                    <TouchableWithoutFeedback
-                        onPress={() => {
-                            this.props.navigation.navigate('Home');
-                        }}
-                    >
-                        <View style={styles.button}>
-                            <Text style={styles.buttonText}>Start</Text>
-                        </View>
-                    </TouchableWithoutFeedback>
-                </View>
-            </ScrollView>)
-    }
-}
-
 // HOME
-export class App extends React.Component {
+export class Home extends React.Component {
     static navigationOptions = {
         header: null
     };
@@ -627,28 +606,30 @@ export class App extends React.Component {
     }
 
     async componentWillMount() {
-        // navigate('Masjid')
         // Check if settings.txt is exist
         await Expo.FileSystem.getInfoAsync(Expo.FileSystem.documentDirectory + "HalalLocal/settings.txt").then(resp => {
             if (!resp.exists) {
                 this.setState({intro: true});
+                this.updateLang(lang);
                 // If not exist (it means first run on the device), create directory, 8-digit ID, settings.txt, and log.txt
                 Expo.FileSystem.makeDirectoryAsync(Expo.FileSystem.documentDirectory + "HalalLocal").then(() => {
                     id = (Math.floor(10000000 + Math.random() * 90000000)).toString();
-                    this.updateLang(lang);
-                    Expo.FileSystem.writeAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/settings.txt", JSON.stringify({id: id, lang: lang})).then(() => {
-                        Expo.FileSystem.writeAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/log.txt", "").then()
-                            .catch(err => {track("!! First saving data => write log.txt: " + err.message);
-                                this.updateLang(lang);
-                            });
-                    }).catch(err => {track("!! First saving data => write settings.txt: " + err.message);
-                        this.updateLang(lang);
-                    });
-                }).catch(err => {track("!! First saving data => create HalalLocal directory: " + err.message);
-                    this.updateLang(lang);
-                });
+                    Expo.FileSystem.writeAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/settings.txt", JSON.stringify({id: id, lang: lang}))
+                        .catch(err => {track("!! Home -> Write settings.txt: " + err.message)});
+                    Expo.FileSystem.writeAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/log.txt", "")
+                        .catch(err => {track("!! Home -> Write log.txt: " + err.message)});
+                    Expo.FileSystem.writeAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/v4.2nd", "")
+                        .catch(err => {track("!! Home -> Write v4.2nd: " + err.message)});
+                }).catch(err => {track("!! Home -> Create HalalLocal directory: " + err.message)});
             }
             else {
+                Expo.FileSystem.getInfoAsync(Expo.FileSystem.documentDirectory + "HalalLocal/v4.2nd").then(resp2 => {
+                    if (!resp2.exists) {
+                        this.setState({intro: true});
+                        Expo.FileSystem.writeAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/v4.2nd", "")
+                            .catch(err => {track("!! Home -> Write v4.2nd: " + err.message)});
+                    }
+                }).catch(err => {track("!! Home -> Check if v4.2nd exist: " + err.message)});
                 // If settings.txt exist (it means app has been run previously), get ID, language, log, and upload log if log is not empty
                 Expo.FileSystem.readAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/settings.txt").then(setting => {
                     let set = JSON.parse(setting);
@@ -658,15 +639,15 @@ export class App extends React.Component {
                     Expo.FileSystem.readAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/log.txt").then(logs => {
                         log = logs;
                         sendData();
-                    }).catch(err => {track("!! First checking data => read log.txt: " + err.message);
-                        this.updateLang(lang);
-                    });
-                }).catch(err => {track("!! First checking data => read settings.txt: " + err.message);
+                    }).catch(err => {track("!! Home -> Read log.txt: " + err.message)});
+                }).catch(err => {
                     this.updateLang(lang);
+                    track("!! Home -> Read settings.txt: " + err.message)
                 });
             }
-        }).catch(err => {track("!! First checking data => check if settings.txt exist: " + err.message);
+        }).catch(err => {
             this.updateLang(lang);
+            track("!! Home -> Check if settings.txt exist: " + err.message)
         });
         BackHandler.addEventListener('hardwareBackPress', this.handleBackButtonClick);
     }
@@ -695,20 +676,17 @@ export class App extends React.Component {
             this.intPrayer();
         }
         else {
-            track("!! Home: Tidak diberikan permission atas location");
-            ToastAndroid.show(this.state.lg.alert.nolocation, ToastAndroid.SHORT);
             resto.markers = -1;
             // To differentiate if the permission is not granted then need to get current location again on menu Mosque
             mosque.markers = -1;
             // To differentiate if the permission is not granted then need to get current location again on menu Prayer Time
             prayer.data = -1;
-            // To differentiate if the permission is not granted then need to get current location again on menu Qiblat
+            // To differentiate if the permission is not granted then need to get current location again on menu Qibla
             qiblat = -1;
             // Set value if the location permission is not granted
             this.setState({resto:-1});
             this.setState({mosque:-1});
             this.setState({prayer:-1});
-
 
             let int = setInterval(() => {
                 if (this.intLoc() == "granted"){
@@ -718,6 +696,7 @@ export class App extends React.Component {
                     this.intPrayer();
                 }
             }, 30000);
+            track("!! Home -> No location permission");
         }
     }
 
@@ -727,7 +706,7 @@ export class App extends React.Component {
         BackHandler.removeEventListener('hardwareBackPress', this.handleBackButtonClick);
     }
 
-    shouldComponentUpdate(a,b) {
+    shouldComponentUpdate() {
         return !this.state.intro;
     }
 
@@ -752,7 +731,7 @@ export class App extends React.Component {
             let date = ("0" + new Date().getHours()).slice(-2) + ":" + ("0" + new Date().getMinutes()).slice(-2);
             if (this.state.prayerTime == null || date == "00:00")
                 this.getPrayer();
-            else if (date == this.state.prayer.next[1])
+            else if (date >= this.state.prayer.next[1])
                 this.updatePrayer();
             else
                 this.getTimeDiff(this.state.prayer);
@@ -795,9 +774,8 @@ export class App extends React.Component {
                 this.getTimeDiff(prayer);
             })
             .catch((err) => {
-                console.log(err.message);
-                track("!! Home: Tidak terkoneksi pada internet (getPrayer())");
                 this.setState({prayer:-2});
+                track("!! Home -> getPrayer() -> No internet connection");
             })
     }
 
@@ -905,12 +883,12 @@ export class App extends React.Component {
                                             }
                                         };
                                     }
-                                }).catch(err => {
+                                }).catch(() => {
                                     error = true;
                                 });
                             }
                             done[0] = true;
-                        }).catch(err => {
+                        }).catch(() => {
                             error = true;
                         });
 
@@ -976,11 +954,11 @@ export class App extends React.Component {
                                         }
                                     }
                                     done[1] = true;
-                                }).catch(err => {error = true;});
+                                }).catch(() => {error = true;});
                             }
                             else
                                 done[1] = true;
-                        }).catch(err => {error = true;});
+                        }).catch(() => {error = true;});
                         fetch('https://spreadsheets.google.com/feeds/list/16-07sDLCbE8lA1n6KSDQi72t1bb40I32BdDPWnaxRQY/3/public/values?alt=json&sq=country="' + ctr + '" and adm2="" and locality="" and town=""').then((resp) => {
                             let data = JSON.parse(resp._bodyText).feed.entry;
                             let clone2 = [];
@@ -1034,7 +1012,7 @@ export class App extends React.Component {
                                 }
                             }
                             done[2] = true;
-                        }).catch(err => {error = true;});
+                        }).catch(() => {error = true;});
                         let int2 = setInterval(() => {
                             if (error) {
                                 clearInterval(int2);
@@ -1060,7 +1038,7 @@ export class App extends React.Component {
                             }
                         }, 100);
                     }
-                }).catch(err => {
+                }).catch(() => {
                     process = true;
                 });
             }
@@ -1205,13 +1183,13 @@ export class App extends React.Component {
                                                     }
                                             }
                                         done[0] = true;
-                                    }).catch(err => {
+                                    }).catch(() => {
                                         error = true;
                                     });
                                 }
                                 else
                                     done[0] = true;
-                            }).catch(err => {
+                            }).catch(() => {
                                 error = true;
                             });
                             fetch('https://spreadsheets.google.com/feeds/list/16-07sDLCbE8lA1n6KSDQi72t1bb40I32BdDPWnaxRQY/4/public/values?alt=json&sq=country="' + ctr + '" and adm2="" and locality="" and town=""').then((resp) => {
@@ -1247,7 +1225,7 @@ export class App extends React.Component {
                                             }
                                     }
                                 done[1] = true;
-                            }).catch(err => {
+                            }).catch(() => {
                                 error = true;
                             });
                             let int2 = setInterval(() => {
@@ -1290,7 +1268,7 @@ export class App extends React.Component {
                             }, 100);
                         }
                     });
-                }).catch(err => {
+                }).catch(() => {
                     process = true;
                 });
             }
@@ -1318,7 +1296,7 @@ export class App extends React.Component {
                     <View style={{paddingHorizontal:6}}>
                         <Text style={{fontWeight: 'bold', fontSize: 12, color:'#686868'}}>{item.text.length > 20 ? item.text.slice(0,20)+"..." : item.text}</Text>
                         <Text style={{fontWeight: 'normal', fontSize:12, color:'#909090'}}>{item.source2}</Text>
-                        <Text style={{fontWeight: 'normal', fontSize:12, color: item.open ? '#13a89e' : '#909090'}}>{item.open ? this.state.lg.list.open : item.open === false ? this.state.lg.list.closed : this.state.lg.list.open_na}</Text>
+                        <Text style={{fontWeight: 'normal', fontSize:12, color: item.open ? '#13a89e' : '#909090'}}>{item.open ? this.state.lg.list.open : item.open == false ? this.state.lg.list.closed : this.state.lg.list.open_na}</Text>
                     </View>
                 </View>
             </View>
@@ -1343,15 +1321,15 @@ export class App extends React.Component {
                     borderRadius: 5
                 }}>
                     <TouchableWithoutFeedback onPress={() => {
-                        track("Restaurant: Get direction from list to " + item.text);
                         getDirections(item.dir);
+                        track("Home -> Resto Carousel -> Direction: " + item.text);
                     }}>
                         {content}
                     </TouchableWithoutFeedback>
                 </View>
             </View>
         )
-    }
+    };
 
     onRenderCarousel() {
         if (!this.state.isCarouselLoaded) {
@@ -1380,16 +1358,25 @@ export class App extends React.Component {
                         onPress={(item) => {
                             switch(item) {
                                 case 0:
-                                    track('Menu: Mosque');
-                                    navigate('Masjid')
+                                    if (menuopen) {
+                                        menuopen = false;
+                                        navigate('RestoList');
+                                        track('Home -> Banner -> RestoList');
+                                    }
                                     break;
                                 case 1:
-                                    track('Menu: Trip');
-                                    navigate('Trip')
+                                    if (menuopen) {
+                                        menuopen = false;
+                                        navigate('Mosque');
+                                        track('Home -> Banner -> Mosque');
+                                    }
                                     break;
                                 case 2:
-                                    track("Menu: Prayer");
-                                    navigate('Sholat');
+                                    if (menuopen) {
+                                        menuopen = false;
+                                        navigate('Prayer');
+                                        track('Home -> Banner -> Prayer');
+                                    }
                                     break;
                             }
                         }} />
@@ -1398,13 +1385,15 @@ export class App extends React.Component {
         }
     }
 
-    updateLang(id) {
+    updateLang(language) {
+        if (id == "")
+            id = (Math.floor(10000000 + Math.random() * 90000000)).toString();
         Expo.FileSystem.writeAsStringAsync(Expo.FileSystem.documentDirectory + "HalalLocal/settings.txt", JSON.stringify({
             id: id,
-            lang: id
+            lang: language
         })).then(() => {
         });
-        switch (id) {
+        switch (language) {
             case 'en':
                 lg = require('./lang/en.json');
                 break;
@@ -1418,8 +1407,8 @@ export class App extends React.Component {
                 lg = require('./lang/cn.json');
                 break;
         }
-        this.setState({lang: id, lg: lg});
-        lang = id;
+        this.setState({lang: language, lg: lg});
+        lang = language;
         this.setState({lgdone: true});
         this.setState({show: false});
         if (this.state.resto && this.state.resto.length)
@@ -1510,6 +1499,7 @@ export class App extends React.Component {
                     this.state.lgdone ?
                         <TouchableWithoutFeedback onPress={() => {
                             this.setState({show: true});
+                            track('Home -> Language -> Show');
                         }}>
                             <View style={{height: '100%', alignItems: 'center', justifyContent: 'center', width: 40}}>
                                 <Text style={{color:'white'}}>{this.state.lang.toUpperCase()} ▾</Text>
@@ -1520,24 +1510,6 @@ export class App extends React.Component {
             </View>
         </View>)
     }
-
-    _sendMailAsync = async () => {
-        try {
-            const { status } = await MailComposer.composeAsync({
-                subject: 'Feedback for Halal Local',
-                body: 'Hi! I\'ve got a feedback for you!<br/>My ID is: <b>'+id+'</b><br/><br/>',
-                recipients: ['info@halallocal.com'],
-                isHtml: true,
-            });
-            if (status === 'sent') {
-                Alert.alert(lg.menu.feedbackthanks);
-            } else {
-                track('Email: Error with status '+status);
-            }
-        } catch (e) {
-            track('Email: Error with error '+e.message);
-        }
-    };
 
     render() {
         navigate = this.props.navigation.navigate;
@@ -1589,7 +1561,7 @@ export class App extends React.Component {
         return (
             <View style={{backgroundColor: "#E9E9EF"}}>
                 {
-                    (Platform.OS !== 'android' ?
+                    (Platform.OS != 'android' ?
                         <View style={{alignItems: 'center', justifyContent: 'center', backgroundColor: '#13a89e'}}>
                             <View style={{paddingTop: 20,
                                 backgroundColor: '#13a89e'}}>
@@ -1618,8 +1590,8 @@ export class App extends React.Component {
                                     onPress={() => {
                                         if (menuopen) {
                                             menuopen = false;
-                                            track("Menu: Restaurant");
-                                            navigate('Resto')
+                                            navigate('RestoList');
+                                            track("Home -> Menu -> RestoList");
                                         }
                                     }}
 
@@ -1634,8 +1606,8 @@ export class App extends React.Component {
                                     onPress={() => {
                                         if (menuopen) {
                                             menuopen = false;
-                                            track("Menu: Mosque");
-                                            navigate('Masjid')
+                                            navigate('Mosque');
+                                            track("Home -> Menu -> Mosque");
                                         }
                                     }}
                                 >
@@ -1649,8 +1621,8 @@ export class App extends React.Component {
                                     onPress={() => {
                                         if (menuopen) {
                                             menuopen = false;
-                                            track("Menu: Prayer");
-                                            navigate('Sholat')
+                                            navigate('Prayer');
+                                            track("Home -> Menu -> Prayer");
                                         }
                                     }}
                                 >
@@ -1667,8 +1639,8 @@ export class App extends React.Component {
                                     onPress={() => {
                                         if (menuopen) {
                                             menuopen = false;
-                                            track("Menu: Trip");
                                             navigate('Trip');
+                                            track("Home -> Menu -> Trip");
                                         }
                                     }}
                                 >
@@ -1682,8 +1654,8 @@ export class App extends React.Component {
                                     onPress={() => {
                                         if (menuopen) {
                                             menuopen = false;
-                                            track("Menu: Qiblat");
-                                            navigate('Qiblat')
+                                            navigate('Qibla');
+                                            track("Home -> Menu -> Qibla");
                                         }
                                     }}
                                 >
@@ -1697,8 +1669,8 @@ export class App extends React.Component {
                                     onPress={() => {
                                         if (menuopen) {
                                             menuopen = false;
-                                            track("Menu: Info");
-                                            navigate('Info');
+                                            navigate('Tips');
+                                            track("Home -> Menu -> Tips");
                                         }
                                     }}
                                 >
@@ -1757,8 +1729,8 @@ export class App extends React.Component {
                             onPress={() => {
                                 if (menuopen) {
                                     menuopen = false;
-                                    track("Menu: Restaurant");
-                                    navigate('Resto')
+                                    navigate('RestoList')
+                                    track("Home -> Resto Carousel -> RestoList");
                                 }
                             }}>
                             {restolist}
@@ -1767,8 +1739,8 @@ export class App extends React.Component {
                             onPress={() => {
                                 if (menuopen) {
                                     menuopen = false;
-                                    track("Menu: Mosque");
-                                    navigate('Masjid')
+                                    navigate('Mosque')
+                                    track("Home -> Mosque Snippet -> Mosque");
                                 }
                             }}>
                             <View style={styles.listFeatures}>
@@ -1820,8 +1792,8 @@ export class App extends React.Component {
                                         </MapView>
                                         <TouchableWithoutFeedback
                                             onPress={() => {
-                                                track("Get direction");
                                                 getDirections(this.state.mosque.dir);
+                                                track("Home -> Mosque Snippet -> Direction: " + this.state.mosque.text);
                                             }}>
                                             <View style={{position:'absolute', flexDirection:'row', height: 25,
                                                 justifyContent: 'space-between', alignItems:'center', width:'100%', backgroundColor:'black',
@@ -1858,14 +1830,14 @@ export class App extends React.Component {
                             onPress={() => {
                                 if (menuopen) {
                                     menuopen = false;
-                                    track("Menu: Feed");
-                                    navigate('Feed');
+                                    navigate('Feedback');
+                                    track("Home -> Feedback");
                                 }
                             }}>
                             <View style={{marginTop: 10, backgroundColor: '#13a89e', height: 50, paddingHorizontal: 10, borderRadius: 5,
                                 justifyContent: 'center', alignItems: 'center', marginHorizontal: 20}}>
                                 <Text style={{color: 'white', fontWeight: 'bold', fontSize: 14}}>{this.state.lg.menu.feedback}</Text>
-                                <Text style={{color: 'white'}}>{this.state.lg.menu.feedbacksub}</Text>
+                                <Text style={{color: 'white'}}>{this.state.lg.menu.feedbacktext}</Text>
                             </View>
                         </TouchableWithoutFeedback>
                         <View style={{height:45}}/>
@@ -1887,7 +1859,10 @@ export class App extends React.Component {
                             opacity: 0.7,
                             flex: 1,
                             backgroundColor: 'black'}}>
-                            <TouchableWithoutFeedback style={{flex:1}} onPress={()=>{this.setState({show: false})}}>
+                            <TouchableWithoutFeedback style={{flex:1}} onPress={()=>{
+                                this.setState({show: false})
+                                track('Home -> Language -> Hide');
+                            }}>
                                 <View style={{
                                     flex: 1,
                                     alignItems: 'center',
@@ -1907,28 +1882,40 @@ export class App extends React.Component {
                                 <View style={{width: "100%", backgroundColor: "white", opacity: 1, borderRadius: 10,
                                     justifyContent: 'center'}}>
                                     <View style={{margin: 10}}>
-                                        <TouchableWithoutFeedback onPress={()=>{this.updateLang("en");}}>
+                                        <TouchableWithoutFeedback onPress={()=>{
+                                            this.updateLang("en");
+                                            track('Home -> Language -> EN');
+                                        }}>
                                             <View style={{flexDirection: 'row', marginVertical: 10, alignItems: 'center'}}>
                                                 <Image source={require('./img/png/en2.png')} style={{width: 32, height: 24, marginRight: 10, resizeMode: 'cover'}}/>
                                                 <Text>English</Text>
                                             </View>
                                         </TouchableWithoutFeedback>
                                         <View style={{borderWidth:0.5, borderColor: "lightgrey"}} />
-                                        <TouchableWithoutFeedback onPress={()=>{this.updateLang("id");}}>
+                                        <TouchableWithoutFeedback onPress={()=>{
+                                            this.updateLang("id");
+                                            track('Home -> Language -> ID');
+                                        }}>
                                             <View style={{flexDirection: 'row', marginVertical: 10, alignItems: 'center'}}>
                                                 <Image source={require('./img/png/id2.png')} style={{width: 32, height: 24, marginRight: 10, resizeMode: 'cover'}}/>
                                                 <Text>Bahasa</Text>
                                             </View>
                                         </TouchableWithoutFeedback>
                                         <View style={{borderWidth:0.5, borderColor: "lightgrey"}} />
-                                        <TouchableWithoutFeedback onPress={()=>{this.updateLang("ar");}}>
+                                        <TouchableWithoutFeedback onPress={()=>{
+                                            this.updateLang("ar");
+                                            track('Home -> Language -> AR');
+                                        }}>
                                             <View style={{flexDirection: 'row', marginVertical: 10, alignItems: 'center'}}>
                                                 <Image source={require('./img/png/ar2.png')} style={{width: 32, height: 24, marginRight: 10, resizeMode: 'cover'}}/>
                                                 <Text>العربية</Text>
                                             </View>
                                         </TouchableWithoutFeedback>
                                         <View style={{borderWidth:0.5, borderColor: "lightgrey"}} />
-                                        <TouchableWithoutFeedback onPress={()=>{this.updateLang("cn");}}>
+                                        <TouchableWithoutFeedback onPress={()=>{
+                                            this.updateLang("cn");
+                                            track('Home -> Language -> CN');
+                                        }}>
                                             <View style={{flexDirection: 'row', marginVertical: 10, alignItems: 'center'}}>
                                                 <Image source={require('./img/png/cn2.png')} style={{width: 32, height: 24, marginRight: 10, resizeMode: 'cover'}}/>
                                                 <Text>中文</Text>
@@ -1956,97 +1943,8 @@ export class App extends React.Component {
     }
 }
 
-// RESTO LIST COMPONENT
-class Row extends React.PureComponent {
-    render () {
-        return <View style={styles.listRestoBox}>
-            <TouchableWithoutFeedback onPress={() => {
-                track("Restaurant: Get direction from list to " + this.props.item.text);
-                getDirections(this.props.item.dir);
-            }}>
-                <View style={styles.insideRestoBox}>
-                    <View style={{alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                        width: 100, height: 80, borderRadius: 5}}>
-                        <Image style={{width: 100, height: 80, borderRadius: 5, resizeMode: this.props.item.photo != restodef ? 'cover' : 'contain'}}
-                               source={this.props.item.photo == restodef ? require('./img/png/ic_resto.png') : {uri: this.props.item.photo}} />
-                    </View>
-                    <View style={{paddingLeft: 10,justifyContent:'center'}}>
-                        <Text style={{fontWeight: "bold", fontSize: 14, color: "#686868"}}>{this.props.item.text}</Text>
-                        <Text style={{fontSize: 12, color: "#909090"}}>{lg.list.distance+": ~"+Math.round(this.props.item.distance/100)/10 + lg.list.km}</Text>
-                        <Text style={{fontSize: 12, color: "#909090"}}>{lg.list.source}: {this.props.item.source}</Text>
-                        <Text style={{fontWeight: 'normal', fontSize:12, color: this.props.item.open ? '#13a89e' : '#909090'}}>{this.props.item.open ? lg.list.open : this.props.item.open === false ? lg.list.closed : lg.list.open_na}</Text>
-                    </View>
-                </View>
-            </TouchableWithoutFeedback>
-        </View>
-    }
-}
-
-// PRAYER TIME COMPONENT
-class Row2 extends React.PureComponent {
-    render () {
-        // Check if the current item list matches with current date for formatting
-        let match = new Date().getDate() == this.props.tgl && new Date().getMonth()+1 == prayer.time.month && new Date().getFullYear() == prayer.time.year;
-        return (
-            <View style={{paddingVertical: 10, paddingLeft: 10, borderBottomColor: '#dadada',borderBottomWidth: 1,
-                backgroundColor: match ? "#13a89e" : this.props.tgl % 2 == 0 ? "rgba(19,168,158, 0.2)" : "white"}}>
-                <View style={{flexDirection:"row", alignItems: 'center', justifyContent:'center'}}>
-                    <Text style={{flex:10, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.tgl}</Text>
-                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.sbh.replace(' ','\n')}</Text>
-                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.dhr.replace(' ','\n')}</Text>
-                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.asr.replace(' ','\n')}</Text>
-                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.mgr.replace(' ','\n')}</Text>
-                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.isy.replace(' ','\n')}</Text>
-                </View>
-            </View>
-        )
-    }
-}
-
-let locationWatcher = null;
-
-// QIBLA COMPASS
-class Compass extends React.Component {
-    constructor() {
-        super();
-        this.state = { heading: new Animated.Value(0), accuracy: 0 };
-
-        this.onRotateDebounced = debounce(this.onRotate, 100);
-    }
-
-    onRotate(heading) {
-        Animated.timing(this.state.heading, {
-            toValue: 360 - heading + this.props.degree,
-            duration: 170,
-        }).start();
-    }
-
-    componentWillMount() {
-        if (!locationWatcher) {
-            track("Qiblat: " + this.props.degree + "°")
-            locationWatcher = Location.watchHeadingAsync(({ magHeading, trueHeading, accuracy }) => {
-                this.onRotateDebounced(trueHeading || magHeading);
-            });
-        }
-    }
-
-    render() {
-        let rotationAmount = this.state.heading.interpolate({
-            inputRange: [0, 360],
-            outputRange: ['0deg', '360deg'],
-        });
-        return(<Animated.View
-            style={{transform: [{ rotate: rotationAmount }]}}>
-            <Image style={{ width: 200, height: 200 }}
-                   source={require('./img/png/img_compass.png')}/>
-        </Animated.View>);
-    }
-}
-
-// TRIP
-class Trip extends React.Component {
+// RESTO LIST
+class RestoList extends React.Component {
     static navigationOptions = {
         headerTitle:
             <Image
@@ -2063,10 +1961,15 @@ class Trip extends React.Component {
         headerTintColor: '#fff',
         headerRight:
             <TouchableWithoutFeedback
-                onPress={() => Linking.openURL(trip_url)}>
+                onPress={() => {
+                    if (menuopen2) {
+                        menuopen2 = false;
+                        navigate('RestoMap')
+                        track('Home -> RestoList -> RestoMap');
+                    }}}>
                 <View>
                     <Image
-                        source={require('./img/png/ic_web.png')}
+                        source={require('./img/png/ic_route_white.png')}
                         style={{
                             width: 24,
                             height: 24,
@@ -2080,38 +1983,732 @@ class Trip extends React.Component {
 
     constructor(props) {
         super(props);
-        this.state = {done: 0}
+        this.state = {
+            markers: [], done: [false, false]
+        }
     }
 
-    async componentWillMount(){
-        await fetch(trip_url).then(()=>{
-            this.setState({done: 1});
-        }).catch(err => {track("!! Trip => check website: " + err.message); this.setState({done: -1});});
+    // Temporary query, used to revert the query on autocomplete search box when there is no connection during updateSchedule()
+    qT = query ? Object.assign({}, query) : null;
+
+    int = [0,0,0];
+
+    mount = true;
+
+    nav;
+
+    componentDidMount() {
+        this.place.setAddressText(query ? query.q : "Current location");
+        this.place._onBlur();
+
+        // If autocomplete search box is not empty, then set variable temporary query with it
+        this.qT = query ? Object.assign({}, query) : null;
+
+        this.checkInternet();
     }
 
     componentWillUnmount() {
+        this.clearInt();
+        this.mount = false;
         menuopen = true;
+    }
+
+    clearInt(){
+        for (let i in this.int)
+            clearInterval(this.int[i]);
+        if (this.mount)
+            this.setState({done: [false, false],notif: null,loc: query});
+    }
+
+    // Recheck for location permission whether there is a change
+    async checkPermission() {
+        // Check if the permission of location is not granted since Home screen (var resto.markers == -1)
+        let {status} = await Permissions.askAsync(Permissions.LOCATION);
+        // If the permission finally granted, get nearby restaurants
+        if (status == "granted") {
+            // Get current location
+            location = await Location.getCurrentPositionAsync({enableHighAccuracy:true});
+
+            // If there is no query assigned, set with default one (current location)
+            if (query == null)
+                query = {lat: location.coords.latitude, lng: location.coords.longitude, q: "Current location"};
+            if (this.mount)
+                this.setState({loc: query});
+            // Retrieve nearby restaurants
+            this.updateMarkers([query, {resto: true, qiblat: true}]);
+            // this.checkInternet(true);
+        }
+        // If the permission still not be granted, throw error message
+        else {
+            if (this.state.markers == null || this.state.markers.length == 0)
+                Alert.alert(lg.alert.nolocation);
+            track("!! Home -> RestoList -> No location permission");
+        }
+    }
+
+    checkInternet(update, fetching) {
+        // Temporary markers, used to revert back when there is no connection during updateMarkers() (the screen is showing last markers instead of empty data)
+        let temp = this.state.markers && this.state.markers.length > 0? this.state.markers.slice(0) : [];
+        // Refresh the value of this.state.markers and notif
+        this.clearInt();
+        // If need update, retrieve nearby restaurants
+        if (update)
+            getCountry(query.lat,query.lng).then(ctr => {
+                query.ctr = ctr;
+                updateResto(query);
+            });
+
+        let temp2 = this.state.markers.length;
+        let temp3 = null;
+        let temp4 = true;
+
+        this.int[0] = setInterval(()=>{
+            if (resto.done.every(v => v)) {
+                clearInterval(this.int[0]);
+                if (this.mount)
+                    this.setState({notif: null});
+            }
+            if (!this.state.notif)
+                if (this.mount)
+                    this.setState({notif: lg.notif.getloc});
+            let pos = !this.state.notif ? -1 : this.state.notif.indexOf("...");
+            if (pos!=-1) {
+                if (this.mount)
+                    this.setState({notif: this.state.notif.slice(0, pos)});
+            }
+            else {
+                if (this.mount)
+                    this.setState({notif: this.state.notif + "."});
+            }
+        },300);
+        this.int[1] = setInterval(() => {
+            if (query != temp3) {
+                if (this.mount)
+                    this.setState({notif: lg.notif.getkeywordresto,loc: query});
+                temp3 = query;
+            }
+            if (resto.markers == -1 && !update) {
+                clearInterval(this.int[1]);
+                clearInterval(this.int[0]);
+                if (this.mount)
+                    this.setState({notif: null,markers: resto.markers});
+                this.checkPermission();
+            }
+            else if (resto.markers == -2) {
+                if (!update) {
+                    clearInterval(this.int[1]);
+                    clearInterval(this.int[0]);
+                    if (this.mount)
+                        this.setState({notif: null,markers: resto.markers});
+                    this.updateMarkers([query, {resto: true, qiblat: true}]);
+                }
+                else {
+                    clearInterval(this.int[1]);
+                    clearInterval(this.int[0]);
+                    if (this.mount)
+                        this.setState({markers: resto.markers});
+                    // Revert back the markers (instead of showing empty marker)
+                    if (temp.length>0)
+                        resto = {markers: temp, done: [true, true]};
+                    else
+                        resto = {markers: -2, done: [false, false]};
+                    let intt = setInterval(()=>{
+                        if (query){
+                            clearInterval(intt);
+                            query = Object.assign({}, this.qT ? this.qT : query);
+                            if (this.mount)
+                                this.setState({markers: temp.length ? temp : -2,loc: this.qT ? this.qT : query, notif: null});
+                            this.place.setAddressText(this.qT ? this.qT.q : query.q);
+                            this.place._handleChangeText(this.qT ? this.qT.q : query.q);
+                            this.place._onBlur();
+                        }
+                    },10);
+
+                    // Revert back the pickers' selected value to previously
+                    if (temp.length)
+                        Alert.alert(lg.alert.nointernet);
+                    track("!! Home -> RestoList -> No internet connection");
+                }
+            } else if (temp2 != resto.markers.length || resto.done.every(v => v)) {
+                if (this.mount)
+                    this.setState({markers: resto.markers});
+                if (resto.done.every(v => v)) {
+                    clearInterval(this.int[1]);
+                    clearInterval(this.int[0]);
+                    if (this.mount)
+                        this.setState({notif: lg.notif.finishresto.replace(/{length}/g,resto.markers.length)});
+                    setTimeout(() => {
+                        if (this.mount)
+                            this.setState({notif: null});
+                    }, 2000);
+                    let artemp = resto.markers.map((n,i)=>[i,n.distance]);
+                    artemp.sort((a,b)=>a[1]-b[1]);
+                    this.setState({markers: artemp.map(n=>resto.markers[n[0]])});
+                    // Fetch other features' data as well
+                }
+                else if (resto.done[0]){
+                    if (this.mount)
+                        this.setState({notif: lg.notif.getpointresto});
+                }
+                else if (resto.done[1]){
+                    if (this.mount)
+                        this.setState({notif: lg.notif.getkeywordresto});
+                }
+                temp2 = resto.markers.length;
+                this.qT = Object.assign({}, query);
+                if (fetching && temp4) {
+                    temp4 = false;
+                    fetchData(fetching[0], fetching[1]);
+                }
+            }
+        }, 100);
+        // }
+    }
+
+    // Get new prayer time
+    updateMarkers(fetching){
+        // If the query is not Current location or Current location but location permission is granted
+        if (this.state.markers != -1 || (query != null && query.lat != 0 && query.q != "Current location")) {
+            // Wait for previous query assignment to be finished (from Home screen)
+            this.int[2] = setInterval(() => {
+                // If the var query is assigned
+                if (query) {
+                    // Clear the interval
+                    clearInterval(this.int[2]);
+                    // Retrieve the prayer time
+                    resto={markers: [], done: [false, false]};
+                    this.checkInternet(true, fetching);
+                }
+            }, 100);
+        }
+        else {
+            if (this.state.markers == null || this.state.markers.length == 0)
+            // If the location permission is not granted
+                Alert.alert(lg.alert.nolocation);
+            track("!! Home -> RestoList -> No location permission");
+        }
     }
 
     render() {
         return (
+            <View style={{flex:1, backgroundColor: "#E9E9EF"}}>
+                <View style={{flex:1}}>
+                    <GooglePlacesAutocomplete
+                        ref={place => this.place = place}
+                        placeholder='Search'
+                        minLength={3}
+                        autoFocus={false}
+                        returnKeyType={'search'}
+                        listViewDisplayed='false'
+                        fetchDetails={true}
+                        onPress={(data, details = null) => {
+                            this.clearInt();
+                            query = {lat: details.geometry ? details.geometry.location.lat : 0, lng: details.geometry ? details.geometry.location.lng : 0, q: data.description};
+                            if (this.mount)
+                                this.setState({loc: query,show: null});
+                            // Retrieve for new prayer time
+                            this.updateMarkers([query, {resto: true, qiblat: true}]);
+                            track("Home -> RestoList -> Query: " + data.description);
+                        }}
+                        query={{
+                            key: keyMap,
+                        }}
+                        currentLocation={true} // Will add a 'Current location' button at the top of the predefined places list
+                        nearbyPlacesAPI='None'
+                        textInputProps={{ selectTextOnFocus: true, onBlur: () => {
+                            this.place._onBlur();
+                            if(this.place.getAddressText() == ""){
+                                this.place.setAddressText(this.qT);
+                                this.place._handleChangeText(this.qT);
+                            }
+                        }, onEndEditing: () => {
+                            this.place._onBlur();
+                            if(this.place.getAddressText() == ""){
+                                this.place.setAddressText(this.qT);
+                                this.place._handleChangeText(this.qT);
+                            }
+                        }}}
+                        styles = {{
+                            textInputContainer: {
+                                backgroundColor: '#f5f5f5'
+                            },
+                            textInput: {
+                                backgroundColor: '#fff',
+                                borderRadius: 4,
+                            }
+                        }}
+                        renderRightButton={() =>
+                            <TouchableWithoutFeedback
+                                onPress={() => {
+                                    this.qT = this.place.getAddressText();
+                                    this.place.setAddressText("");
+                                    this.place._handleChangeText("");
+                                    this.place.triggerFocus()
+                                    track("Home -> RestoList -> Clear Query");
+                                }}>
+                                <View
+                                    style={{
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        marginRight: 8,
+                                    }}>
+                                    <Image
+                                        source={require('./img/png/ic_delete.png')}
+                                        style={{
+                                            width: 30,
+                                            height: 30,
+                                            alignSelf: 'center',
+                                            resizeMode: 'contain'
+                                        }}/>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        }
+                        enablePoweredByContainer={false}>
 
-            (this.state.done == 1 ?
-                <WebView
-                    source={{uri: trip_url}}
-                /> : (this.state.done == -1 ? <View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
-                    <Image source={require('./img/nowifi.png')} style={{width: 40, height: 40, resizeMode: 'contain'}} />
-                    <Text>{lg.alert.nointernet}</Text>
-                </View> :
-                    <View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
-                        <Loading />
-                    </View>))
+                        {
+                            (this.state.markers != null && this.state.markers.length != 0?
+                                (this.state.markers == -1 ?
+                                    (<View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
+                                        <Image source={require('./img/nolocation.png')} style={{width: 100, height: 100, resizeMode: 'contain'}} />
+                                        <Text>{lg.alert.nolocation}</Text>
+                                    </View>) :
+                                    (this.state.markers == -2 ?
+                                        (<View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
+                                            <Image source={require('./img/nowifi.png')} style={{width: 100, height: 100, resizeMode: 'contain'}} />
+                                            <Text>{lg.alert.nointernet}</Text>
+                                        </View>) :
+                                        (this.state.markers.length == 0 && this.state.done.every(t => t) ?
+                                            (<View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
+                                                <Image source={require('./img/noresto.png')} style={{width: 100, height: 100, resizeMode: 'contain'}} />
+                                                <Text>{lg.alert.noresto}</Text>
+                                            </View>) :
+                                            (<FlatList
+                                                style={{ flex: 1, paddingTop: 5 }}
+                                                data={this.state.markers}
+                                                renderItem={({ item }) => <RestoItem item={item}/>}
+                                                updateCellsBatchingPeriod={100}
+                                            />)))) :
+                                (<Loading />))
+                        }
+                    </GooglePlacesAutocomplete>
+                </View>
+                {
+                    this.state.notif ?
+                        (<View style={{
+                            position: "absolute",
+                            top: 44,
+                            width: '100%',
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: "#303030"
+                        }}>
+                            <Text style={{fontWeight: "bold", color: "white"}}>{this.state.notif}</Text>
+                        </View>) : <View/>}
+
+            </View>
         );
     }
 }
 
+// RESTO MAP
+class RestoMap extends React.Component {
+    static navigationOptions = {
+        headerTitle:
+            <Image
+                source={require('./img/png/img_htitle.png')}
+                style={{
+                    width: 110,
+                    height: 40,
+                    alignSelf: 'center',
+                    resizeMode: 'contain'
+                }} />,
+        headerStyle: {
+            backgroundColor: '#13a89e',
+        },
+        headerTintColor: '#fff',
+        headerRight:
+            <View/>
+    };
+
+    constructor(props) {
+        super(props);
+        this.state = {
+            markers: [], done: [false, false]
+        }
+    }
+
+    // Temporary query, used to revert the query on autocomplete search box when there is no connection during updateSchedule()
+    qT = query ? Object.assign({}, query) : null;
+
+    int = [0,0,0];
+
+    mount = true;
+
+    tog = true;
+
+    componentWillMount() {
+
+    }
+
+    componentDidMount() {
+        // If autocomplete search box is not empty, then set variable temporary query with it
+        this.qT = query ? Object.assign({}, query) : null;
+        this.checkInternet();
+    }
+
+    componentWillUnmount() {
+        this.clearInt();
+        this.mount = false;
+        menuopen2 = true;
+    }
+
+    clearInt(){
+        for (let i in this.int)
+            clearInterval(this.int[i]);
+        if (this.mount)
+            this.setState({done: [false, false],notif: null,loc: query});
+        // this.setState({done: [false, false]});
+        // this.setState({notif: null});
+        // this.setState({loc: query});
+    }
+
+    // Recheck for location permission whether there is a change
+    async checkPermission() {
+        // Check if the permission of location is not granted since Home screen (var resto.markers == -1)
+        let {status} = await Permissions.askAsync(Permissions.LOCATION);
+        // If the permission finally granted, get nearby restaurants
+        if (status == "granted") {
+            // Get current location
+            location = await Location.getCurrentPositionAsync({enableHighAccuracy:true});
+
+            // If there is no query assigned, set with default one (current location)
+            if (query == null)
+                query = {lat: location.coords.latitude, lng: location.coords.longitude, q: "Current location"};
+            if (this.mount)
+                this.setState({loc: query});
+            // Retrieve nearby restaurants
+            this.updateMarkers([query, {resto: true, qiblat: true}]);
+            // this.checkInternet(true);
+        }
+        // If the permission still not be granted, throw error message
+        else {
+            Alert.alert(lg.alert.nolocation);
+            track("!! Home -> RestoMap -> No location permission");
+        }
+    }
+
+    checkInternet(update, fetching) {
+        // Temporary markers, used to revert back when there is no connection during updateMarkers() (the screen is showing last markers instead of empty data)
+        let temp = this.state.markers && this.state.markers.length > 0? this.state.markers.slice(0) : [];
+        // Refresh the value of this.state.markers and notif
+        this.clearInt();
+        // If need update, retrieve nearby restaurants
+        if (update)
+            getCountry(query.lat,query.lng).then(ctr => {
+                query.ctr = ctr;
+                updateResto(query);
+            });
+
+        let temp2 = this.state.markers.length;
+        let temp3 = null;
+        let temp4 = true;
+
+        this.int[0] = setInterval(()=>{
+            if (resto.done.every(v => v)) {
+                clearInterval(this.int[0]);
+                if (this.mount)
+                    this.setState({notif: null});
+            }
+            if (!this.state.notif)
+                if (this.mount)
+                    this.setState({notif: lg.notif.getloc});
+            let pos = !this.state.notif ? -1 : this.state.notif.indexOf("...");
+            if (pos!=-1) {
+                if (this.mount)
+                    this.setState({notif: this.state.notif.slice(0, pos)});
+            }
+            else {
+                if (this.mount)
+                    this.setState({notif: this.state.notif + "."});
+            }
+        },300);
+        this.int[1] = setInterval(() => {
+            if (query != temp3) {
+                if (this.mount)
+                    this.setState({notif: lg.notif.getkeywordresto, loc: query});
+                temp3 = query;
+                if (this.mount)
+                    this.map.animateToRegion(
+                        {
+                            latitude: query.lat,
+                            longitude: query.lng,
+                            latitudeDelta: 0.0922,
+                            longitudeDelta: 0.033,
+                        }, 500
+                    );
+            }
+            if (resto.markers == -1 && !update) {
+                clearInterval(this.int[1]);
+                clearInterval(this.int[0]);
+                if (this.mount)
+                    this.setState({notif: null,markers: resto.markers});
+                this.checkPermission();
+            }
+            else if (resto.markers == -2) {
+                if (!update) {
+                    clearInterval(this.int[1]);
+                    clearInterval(this.int[0]);
+                    if (this.mount)
+                        this.setState({notif: null,markers: resto.markers});
+                    this.updateMarkers([query, {resto: true, qiblat: true}]);
+                }
+                else {
+                    clearInterval(this.int[1]);
+                    clearInterval(this.int[0]);
+                    if (this.mount)
+                        this.setState({markers: resto.markers});
+                    // Revert back the markers (instead of showing empty marker)
+                    if (temp.length>0)
+                        resto = {markers: temp, done: [true, true]};
+                    else
+                        resto = {markers: -2, done: [false, false]};
+                    let intt = setInterval(()=>{
+                        if (query){
+                            clearInterval(intt);
+                            query = Object.assign({}, this.qT ? this.qT : query);
+                            if (this.mount)
+                                this.setState({markers: temp,loc: this.qT ? this.qT : query, notif: null});
+                            if (this.mount)
+                                this.map.fitToElements(true);
+                        }
+                    },10);
+
+                    // Revert back the pickers' selected value to previously
+                    Alert.alert(lg.alert.nointernet);
+
+                    track("!! Home -> RestoMap -> No internet connection");
+                }
+            } else if (temp2 != resto.markers.length || resto.done.every(v => v)) {
+                if (this.mount)
+                    this.setState({markers: resto.markers});
+                if (resto.done.every(v => v)) {
+                    clearInterval(this.int[1]);
+                    clearInterval(this.int[0]);
+                    this.loc ? this.loc.showCallout() : null;
+                    if (this.mount)
+                        this.setState({notif: lg.notif.finishresto.replace(/{length}/g,resto.markers.length)});
+                    setTimeout(() => {
+                        if (this.mount)
+                            this.setState({notif: null});
+                    }, 2000);
+                    // Fetch other features' data as well
+                }
+                else if (resto.done[0]){
+                    if (this.mount)
+                        this.setState({notif: lg.notif.getpointresto});
+                }
+                else if (resto.done[1]){
+                    if (this.mount)
+                        this.setState({notif: lg.notif.getkeywordresto});
+                }
+                temp2 = resto.markers.length;
+                if (this.mount)
+                    this.map.fitToElements(true);
+                this.qT = Object.assign({}, query);
+                if (fetching && temp4) {
+                    temp4 = false;
+                    fetchData(fetching[0], fetching[1]);
+                }
+            }
+        }, 100);
+        // }
+    }
+
+    // Get new prayer time
+    updateMarkers(fetching){
+        // If the query is not Current location or Current location but location permission is granted
+        if (this.state.markers != -1 || (query != null && query.lat != 0 && query.q != "Current location")) {
+            // Wait for previous query assignment to be finished (from Home screen)
+            this.int[2] = setInterval(() => {
+                // If the var query is assigned
+                if (query) {
+                    // Clear the interval
+                    clearInterval(this.int[2]);
+                    // Retrieve the prayer time
+                    resto={markers: [], done: [false, false]};
+                    this.checkInternet(true, fetching);
+                }
+            }, 100);
+        }
+        else {
+            // If the location permission is not granted
+            Alert.alert(lg.alert.nolocation);
+            track("!! Home -> RestoMap -> No location permission");
+        }
+
+    }
+
+
+    render() {
+        return (
+            <View style={{flex:1, backgroundColor: "#E9E9EF"}}>
+                <View style={{flex:1}}>
+                    <MapView
+                        provider="google"
+                        loadingEnabled={true}
+                        style={{flex:1}}
+                        ref={map => {this.map = map}}
+                        initialRegion={{
+                            latitude: query && query.lat ? query.lat : -6.904391,
+                            longitude: query && query.lng ? query.lng : 107.616946,
+                            latitudeDelta: 0.0922,
+                            longitudeDelta: 0.033,
+                        }}
+                        onPress={()=> {
+                            if (this.tog)
+                                if (this.mount)
+                                    this.setState({show: null});
+                            track("Home -> RestoMap -> Tap Map (Close Info Bar)");
+                        }}
+                    >
+                        { (this.state.loc && this.state.loc.lat) ?
+                            (<MapView.Marker
+                                ref={loc => this.loc = loc}
+                                key="loc"
+                                coordinate={{latitude: this.state.loc.lat, longitude: this.state.loc.lng}}
+                                title={this.state.loc.q}
+                                image={require('./img/png/img_mcurrent.png')}
+                            />) : (<View/>)
+                        }
+
+                        {this.state.markers && this.state.markers.length>1 ? this.state.markers.map(marker => (
+                            <MapView.Marker
+                                key={marker.key}
+                                coordinate={marker.coordinate}
+                                onPress={()=>{
+                                    this.tog = false;
+                                    if (this.mount)
+                                        this.setState({show: marker.key});
+                                    setTimeout(()=>{this.tog = true},100);
+                                    track("Home -> RestoMap -> Show Info Bar: " + marker.text);
+                                }}
+                                title={marker.text}
+                                description={lg.list.source+": "+marker.source}
+                                image={require('./img/png/img_mresto.png')}
+                            >
+                            </MapView.Marker>
+                        )):<View/>}
+
+                    </MapView>
+                </View>
+                {
+                    this.state.show != null ?
+                        (<View style={{
+                            position: "absolute",
+                            bottom: 0,
+                            width: '100%',
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            alignSelf: 'center',
+                        }}>
+                            <View style={{
+                                // position: "absolute",
+                                padding: 10,
+                                margin: 10,
+                                height: 100,
+                                flex: 1,
+                                backgroundColor: "white",
+                                flexDirection: "row",
+                                alignSelf: 'center',
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                borderColor: '#dadada',
+                            }}>
+                                <View style={{alignItems: 'center',
+                                    justifyContent: 'center',
+                                    overflow: 'hidden',
+                                    width: 100, height: 80, borderRadius: 5}}>
+                                    <Image style={{width: 100, height: 80, borderRadius: 5, resizeMode: this.state.markers[this.state.show].photo != restodef ? 'cover' : 'contain'}}
+                                           source={this.state.markers[this.state.show].photo == restodef ? require('./img/png/ic_resto.png') : {uri: this.state.markers[this.state.show].photo}} />
+                                </View>
+                                <View style={{marginLeft: 10, flexDirection: 'column', flex: 1}}>
+                                    <Text style={{fontWeight: "bold", fontSize: 14, color: "#686868"}}>{this.state.markers[this.state.show].text}</Text>
+                                    <Text style={{fontSize: 12, color: "#909090"}}>{lg.list.distance+": ~"+Math.round(this.state.markers[this.state.show].distance/100)/10 + lg.list.km}</Text>
+                                    <Text style={{fontSize: 12, color: "#909090"}}>{lg.list.source}: {this.state.markers[this.state.show].source}</Text>
+                                    <Text style={{fontWeight: 'normal', fontSize:12, color: this.state.markers[this.state.show].open ? '#13a89e' : '#909090'}}>{this.state.markers[this.state.show].open ? lg.list.open : this.state.markers[this.state.show].open == false ? lg.list.closed : lg.list.open_na}</Text>
+                                </View>
+                                <View style={{justifyContent: 'space-around'}}>
+                                    <View style={{flex:1, alignItems: 'flex-end', justifyContent: 'flex-start'}}>
+                                        <TouchableWithoutFeedback onPress={() => {
+                                            if (this.mount)
+                                                this.setState({show: null})
+                                            track("Home -> RestoMap -> Info Bar -> Close");
+                                        }}>
+                                            <Image source={require('./img/close.png')} style={{width: 24, height: 24, resizeMode: 'contain'}} />
+                                        </TouchableWithoutFeedback>
+                                    </View>
+                                    <View style={{flex:1, alignItems: 'flex-end', justifyContent: 'flex-end'}}>
+                                        <TouchableWithoutFeedback onPress={() => {
+                                            getDirections(this.state.markers[this.state.show].dir)
+                                            track("Home -> RestoMap -> Info Bar -> Direction: " + this.state.markers[this.state.show].text);
+                                        }}>
+                                            <Image source={require('./img/direction.png')} style={{width: 24, height: 24, resizeMode: 'contain'}} />
+                                        </TouchableWithoutFeedback>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>) : <View/>}
+                {
+                    this.state.notif ?
+                        (<View style={{
+                            position: "absolute",
+                            top: 0,
+                            width: 360,
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: "#303030"
+                        }}>
+                            <Text style={{fontWeight: "bold", color: "white"}}>{this.state.notif}</Text>
+                        </View>) : <View/>}
+
+            </View>
+        );
+    }
+}
+
+// RESTO LIST COMPONENT
+class RestoItem extends React.PureComponent {
+    render () {
+        return <View style={styles.listRestoBox}>
+            <TouchableWithoutFeedback onPress={() => {
+                getDirections(this.props.item.dir);
+                track("Home -> RestoList -> Direction: " + this.props.item.text);
+            }}>
+                <View style={styles.insideRestoBox}>
+                    <View style={{alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        width: 100, height: 80, borderRadius: 5}}>
+                        <Image style={{width: 100, height: 80, borderRadius: 5, resizeMode: this.props.item.photo != restodef ? 'cover' : 'contain'}}
+                               source={this.props.item.photo == restodef ? require('./img/png/ic_resto.png') : {uri: this.props.item.photo}} />
+                    </View>
+                    <View style={{paddingLeft: 10,justifyContent:'center'}}>
+                        <Text style={{fontWeight: "bold", fontSize: 14, color: "#686868"}}>{this.props.item.text}</Text>
+                        <Text style={{fontSize: 12, color: "#909090"}}>{lg.list.distance+": ~"+Math.round(this.props.item.distance/100)/10 + lg.list.km}</Text>
+                        <Text style={{fontSize: 12, color: "#909090"}}>{lg.list.source}: {this.props.item.source}</Text>
+                        <Text style={{fontWeight: 'normal', fontSize:12, color: this.props.item.open ? '#13a89e' : '#909090'}}>{this.props.item.open ? lg.list.open : this.props.item.open == false ? lg.list.closed : lg.list.open_na}</Text>
+                    </View>
+                </View>
+            </TouchableWithoutFeedback>
+        </View>
+    }
+}
+
 // MASJID
-class Masjid extends React.Component {
+class Mosque extends React.Component {
     static navigationOptions = {
         headerTitle:
             <Image
@@ -2167,9 +2764,6 @@ class Masjid extends React.Component {
             clearInterval(this.int[i]);
         if (this.mount)
             this.setState({done: [false, false],notif: null,loc: query});
-        // this.setState({done: [false, false]});
-        // this.setState({notif: null});
-        // this.setState({loc: query});
     }
 
     // Recheck for location permission whether there is a change
@@ -2192,9 +2786,8 @@ class Masjid extends React.Component {
         }
         // If the permission still not be granted, throw error message
         else {
-            track("!! Mosque: Tidak diberikan permission atas location");
             Alert.alert(lg.alert.nolocation);
-            //UBAH KE SNACKBAR
+            track("!! Home -> Mosque -> No location permission");
         }
     }
 
@@ -2291,7 +2884,7 @@ class Masjid extends React.Component {
 
                     // Revert back the pickers' selected value to previously
                     Alert.alert(lg.alert.nointernet);
-                    //UBAH KE SNACKBAR
+                    track("!! Home -> Mosque -> No internet connection");
                 }
             } else if (temp2 != mosque.markers.length || mosque.done.every(v => v)) {
                 if (this.mount)
@@ -2345,10 +2938,11 @@ class Masjid extends React.Component {
                 }
             }, 100);
         }
-        else
-        // If the location permission is not granted
+        else {
+            // If the location permission is not granted
             Alert.alert(lg.alert.nolocation);
-        //UBAH KE SNACKBAR
+            track("!! Home -> Mosque -> No location permission");
+        }
     }
 
     render() {
@@ -2371,7 +2965,7 @@ class Masjid extends React.Component {
                                 this.setState({loc: query,show: null});
                             // Retrieve for new prayer time
                             this.updateMarkers([query, {mosque: true, qiblat: true}]);
-                            track("Mosque: Query for " + data.description);
+                            track('Home -> Mosque -> Query: ' + data.description);
                         }}
                         query={{
                             key: keyMap,
@@ -2398,27 +2992,22 @@ class Masjid extends React.Component {
                             textInput: {
                                 backgroundColor: '#fff',
                                 borderRadius: 4,
-                                // marginLeft: 0,
-                                // marginRight: 0,
-                                // height: 38,
-                                // color: '#5d5d5d',
-                                // fontSize: 16
                             }
                         }}
                         renderRightButton={() =>
                             <TouchableWithoutFeedback
-                                onPress = {() => {
-                                    track("Mosque: Clear query");
+                                onPress={() => {
+                                    this.qT = this.place.getAddressText();
                                     this.place.setAddressText("");
                                     this.place._handleChangeText("");
-                                    this.place.triggerFocus()}}>
+                                    this.place.triggerFocus()
+                                    track('Home -> Mosque -> Clear Query');
+                                }}>
                                 <View
-                                    style = {{
+                                    style={{
                                         justifyContent: 'center',
                                         alignItems: 'center',
-                                        marginTop: 8,
                                         marginRight: 8,
-                                        // marginLeft: 8
                                     }}>
                                     <Image
                                         source={require('./img/png/ic_delete.png')}
@@ -2427,7 +3016,7 @@ class Masjid extends React.Component {
                                             height: 30,
                                             alignSelf: 'center',
                                             resizeMode: 'contain'
-                                        }} />
+                                        }}/>
                                 </View>
                             </TouchableWithoutFeedback>
                         }
@@ -2446,6 +3035,7 @@ class Masjid extends React.Component {
                                 if (this.tog)
                                     if (this.mount)
                                         this.setState({show: null});
+                                track('Home -> Mosque -> Tap Map (Close Info Bar)');
                             }}
                             provider="google"
                         >
@@ -2464,10 +3054,11 @@ class Masjid extends React.Component {
                                     key={marker.key}
                                     coordinate={marker.coordinate}
                                     onPress={()=>{
-                                        this.tog = false
+                                        this.tog = false;
                                         if (this.mount)
                                             this.setState({show: marker.key});
                                         setTimeout(()=>{this.tog = true},100);
+                                        track('Home -> Mosque -> Show Info Bar: ' + marker.text);
                                     }}
                                     title={marker.text}
                                     description={lg.list.source+": "+marker.source}
@@ -2519,14 +3110,17 @@ class Masjid extends React.Component {
                                     <View style={{flex:1, alignItems: 'flex-end', justifyContent: 'flex-start'}}>
                                         <TouchableWithoutFeedback onPress={() => {
                                             if (this.mount)
-                                                this.setState({show: null})}}>
+                                                this.setState({show: null})
+                                            track('Home -> Mosque -> Info Bar -> Close');
+                                        }}>
                                             <Image source={require('./img/close.png')} style={{width: 24, height: 24, resizeMode: 'contain'}} />
                                         </TouchableWithoutFeedback>
                                     </View>
                                     <View style={{flex:1, alignItems: 'flex-end', justifyContent: 'flex-end'}}>
                                         <TouchableWithoutFeedback onPress={() => {
-                                            track("Mosque: Get direction from map to " + this.state.markers[this.state.show].text);
-                                            getDirections(this.state.markers[this.state.show].dir)}}>
+                                            getDirections(this.state.markers[this.state.show].dir)
+                                            track("Home -> Mosque -> Info Bar -> Direction: " + this.state.markers[this.state.show].text);
+                                        }}>
                                             <Image source={require('./img/direction.png')} style={{width: 24, height: 24, resizeMode: 'contain'}} />
                                         </TouchableWithoutFeedback>
                                     </View>
@@ -2539,738 +3133,6 @@ class Masjid extends React.Component {
                             position: "absolute",
                             top: 44,
                             width: '100%',
-                            flex: 1,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: "#303030"
-                        }}>
-                            <Text style={{fontWeight: "bold", color: "white"}}>{this.state.notif}</Text>
-                        </View>) : <View/>}
-
-            </View>
-        );
-    }
-}
-
-// RESTO LIST
-class Resto extends React.Component {
-    static navigationOptions = {
-        headerTitle:
-            <Image
-                source={require('./img/png/img_htitle.png')}
-                style={{
-                    width: 110,
-                    height: 40,
-                    alignSelf: 'center',
-                    resizeMode: 'contain'
-                }} />,
-        headerStyle: {
-            backgroundColor: '#13a89e',
-        },
-        headerTintColor: '#fff',
-        headerRight:
-            <TouchableWithoutFeedback
-                onPress={() => {
-                    if (menuopen2) {
-                        menuopen2 = false;
-                        navigate('Resto2')
-                    }}}>
-                <View>
-                    <Image
-                        source={require('./img/png/ic_route_white.png')}
-                        style={{
-                            width: 24,
-                            height: 24,
-                            alignSelf: 'center',
-                            resizeMode: 'contain',
-                            margin: 20
-                        }} />
-                </View>
-            </TouchableWithoutFeedback>
-    };
-
-    constructor(props) {
-        super(props);
-        this.state = {
-            markers: [], done: [false, false]
-        }
-    }
-
-    // Temporary query, used to revert the query on autocomplete search box when there is no connection during updateSchedule()
-    qT = query ? Object.assign({}, query) : null;
-
-    int = [0,0,0];
-
-    mount = true;
-
-    nav;
-
-    componentDidMount() {
-        this.place.setAddressText(query ? query.q : "Current location");
-        this.place._onBlur();
-
-        // If autocomplete search box is not empty, then set variable temporary query with it
-        this.qT = query ? Object.assign({}, query) : null;
-
-        this.checkInternet();
-    }
-
-    componentWillUnmount() {
-        this.clearInt();
-        this.mount = false;
-        menuopen = true;
-    }
-
-    clearInt(){
-        for (let i in this.int)
-            clearInterval(this.int[i]);
-        if (this.mount)
-            this.setState({done: [false, false],notif: null,loc: query});
-        // this.setState({done: [false, false]});
-        // this.setState({notif: null});
-        // this.setState({loc: query});
-    }
-
-    // Recheck for location permission whether there is a change
-    async checkPermission() {
-        // Check if the permission of location is not granted since Home screen (var resto.markers == -1)
-        let {status} = await Permissions.askAsync(Permissions.LOCATION);
-        // If the permission finally granted, get nearby restaurants
-        if (status == "granted") {
-            // Get current location
-            location = await Location.getCurrentPositionAsync({enableHighAccuracy:true});
-
-            // If there is no query assigned, set with default one (current location)
-            if (query == null)
-                query = {lat: location.coords.latitude, lng: location.coords.longitude, q: "Current location"};
-            if (this.mount)
-                this.setState({loc: query});
-            // Retrieve nearby restaurants
-            this.updateMarkers([query, {resto: true, qiblat: true}]);
-            // this.checkInternet(true);
-        }
-        // If the permission still not be granted, throw error message
-        else {
-            track("!! Resto: Tidak diberikan permission atas location");
-            if (this.state.markers == null || this.state.markers.length == 0)
-                Alert.alert(lg.alert.nolocation);
-            // UBAH KE SNACKBAR
-        }
-    }
-
-    checkInternet(update, fetching) {
-        // Temporary markers, used to revert back when there is no connection during updateMarkers() (the screen is showing last markers instead of empty data)
-        let temp = this.state.markers && this.state.markers.length > 0? this.state.markers.slice(0) : [];
-        // Refresh the value of this.state.markers and notif
-        this.clearInt();
-        // If need update, retrieve nearby restaurants
-        if (update)
-            getCountry(query.lat,query.lng).then(ctr => {
-                query.ctr = ctr;
-                updateResto(query);
-            });
-
-        let temp2 = this.state.markers.length;
-        let temp3 = null;
-        let temp4 = true;
-
-        this.int[0] = setInterval(()=>{
-            if (resto.done.every(v => v)) {
-                clearInterval(this.int[0]);
-                if (this.mount)
-                    this.setState({notif: null});
-            }
-            if (!this.state.notif)
-                if (this.mount)
-                    this.setState({notif: lg.notif.getloc});
-            let pos = !this.state.notif ? -1 : this.state.notif.indexOf("...");
-            if (pos!=-1) {
-                if (this.mount)
-                    this.setState({notif: this.state.notif.slice(0, pos)});
-            }
-            else {
-                if (this.mount)
-                    this.setState({notif: this.state.notif + "."});
-            }
-        },300);
-        this.int[1] = setInterval(() => {
-            if (query != temp3) {
-                if (this.mount)
-                    this.setState({notif: lg.notif.getkeywordresto,loc: query});
-                temp3 = query;
-            }
-            if (resto.markers == -1 && !update) {
-                clearInterval(this.int[1]);
-                clearInterval(this.int[0]);
-                if (this.mount)
-                    this.setState({notif: null,markers: resto.markers});
-                this.checkPermission();
-            }
-            else if (resto.markers == -2) {
-                if (!update) {
-                    clearInterval(this.int[1]);
-                    clearInterval(this.int[0]);
-                    if (this.mount)
-                        this.setState({notif: null,markers: resto.markers});
-                    this.updateMarkers([query, {resto: true, qiblat: true}]);
-                }
-                else {
-                    clearInterval(this.int[1]);
-                    clearInterval(this.int[0]);
-                    if (this.mount)
-                        this.setState({markers: resto.markers});
-                    // Revert back the markers (instead of showing empty marker)
-                    if (temp.length>0)
-                        resto = {markers: temp, done: [true, true]};
-                    else
-                        resto = {markers: -2, done: [false, false]};
-                    let intt = setInterval(()=>{
-                        if (query){
-                            clearInterval(intt);
-                            query = Object.assign({}, this.qT ? this.qT : query);
-                            if (this.mount)
-                                this.setState({markers: temp.length ? temp : -2,loc: this.qT ? this.qT : query, notif: null});
-                            this.place.setAddressText(this.qT ? this.qT.q : query.q);
-                            this.place._handleChangeText(this.qT ? this.qT.q : query.q);
-                            this.place._onBlur();
-                        }
-                    },10);
-
-                    // Revert back the pickers' selected value to previously
-                    if (temp.length)
-                        Alert.alert(lg.alert.nointernet);
-                    // UBAH KE SNACKBAR
-                }
-            } else if (temp2 != resto.markers.length || resto.done.every(v => v)) {
-                if (this.mount)
-                    this.setState({markers: resto.markers});
-                if (resto.done.every(v => v)) {
-                    clearInterval(this.int[1]);
-                    clearInterval(this.int[0]);
-                    if (this.mount)
-                        this.setState({notif: lg.notif.finishresto.replace(/{length}/g,resto.markers.length)});
-                    setTimeout(() => {
-                        if (this.mount)
-                            this.setState({notif: null});
-                    }, 2000);
-                    let artemp = resto.markers.map((n,i)=>[i,n.distance]);
-                    artemp.sort((a,b)=>a[1]-b[1]);
-                    this.setState({markers: artemp.map(n=>resto.markers[n[0]])});
-                    // Fetch other features' data as well
-                }
-                else if (resto.done[0]){
-                    if (this.mount)
-                        this.setState({notif: lg.notif.getpointresto});
-                }
-                else if (resto.done[1]){
-                    if (this.mount)
-                        this.setState({notif: lg.notif.getkeywordresto});
-                }
-                temp2 = resto.markers.length;
-                this.qT = Object.assign({}, query);
-                if (fetching && temp4) {
-                    temp4 = false;
-                    fetchData(fetching[0], fetching[1]);
-                }
-            }
-        }, 100);
-        // }
-    }
-
-    // Get new prayer time
-    updateMarkers(fetching){
-        // If the query is not Current location or Current location but location permission is granted
-        if (this.state.markers != -1 || (query != null && query.lat != 0 && query.q != "Current location")) {
-            // Wait for previous query assignment to be finished (from Home screen)
-            this.int[2] = setInterval(() => {
-                // If the var query is assigned
-                if (query) {
-                    // Clear the interval
-                    clearInterval(this.int[2]);
-                    // Retrieve the prayer time
-                    resto={markers: [], done: [false, false]};
-                    this.checkInternet(true, fetching);
-                }
-            }, 100);
-        }
-        else
-        if (this.state.markers == null || this.state.markers.length == 0)
-        // If the location permission is not granted
-            Alert.alert(lg.alert.nolocation);
-        // UBAH KE SNACKBAR
-    }
-
-    render() {
-        return (
-            <View style={{flex:1, backgroundColor: "#E9E9EF"}}>
-                <View style={{flex:1}}>
-                    <GooglePlacesAutocomplete
-                        ref={place => this.place = place}
-                        placeholder='Search'
-                        minLength={3}
-                        autoFocus={false}
-                        returnKeyType={'search'}
-                        listViewDisplayed='false'
-                        fetchDetails={true}
-                        onPress={(data, details = null) => {
-                            this.clearInt();
-                            query = {lat: details.geometry ? details.geometry.location.lat : 0, lng: details.geometry ? details.geometry.location.lng : 0, q: data.description};
-                            if (this.mount)
-                                this.setState({loc: query,show: null});
-                            // Retrieve for new prayer time
-                            this.updateMarkers([query, {resto: true, qiblat: true}]);
-                            track("Resto: Query for " + data.description);
-                        }}
-                        query={{
-                            key: keyMap,
-                        }}
-                        currentLocation={true} // Will add a 'Current location' button at the top of the predefined places list
-                        nearbyPlacesAPI='None'
-                        textInputProps={{ selectTextOnFocus: true, onBlur: () => {
-                            this.place._onBlur();
-                            if(this.place.getAddressText() == ""){
-                                this.place.setAddressText(this.qT);
-                                this.place._handleChangeText(this.qT);
-                            }
-                        }, onEndEditing: () => {
-                            this.place._onBlur();
-                            if(this.place.getAddressText() == ""){
-                                this.place.setAddressText(this.qT);
-                                this.place._handleChangeText(this.qT);
-                            }
-                        }}}
-                        styles = {{
-                            textInputContainer: {
-                                backgroundColor: '#f5f5f5'
-                            },
-                            textInput: {
-                                backgroundColor: '#fff',
-                                borderRadius: 4,
-                            }
-                        }}
-                        renderRightButton={() =>
-                            <TouchableWithoutFeedback
-                                onPress = {() => {
-                                    track("Resto: Clear query");
-                                    this.place.setAddressText("");
-                                    this.place._handleChangeText("");
-                                    this.place.triggerFocus()}}>
-                                <View
-                                    style = {{
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                        marginTop: 8,
-                                        marginRight: 8,
-                                        // marginLeft: 8
-                                    }}>
-                                    <Image
-                                        source={require('./img/png/ic_delete.png')}
-                                        style={{
-                                            width: 30,
-                                            height: 30,
-                                            alignSelf: 'center',
-                                            resizeMode: 'contain'
-                                        }} />
-                                </View>
-                            </TouchableWithoutFeedback>
-                        }
-                        enablePoweredByContainer={false}>
-
-                        {
-                            (this.state.markers != null && this.state.markers.length != 0?
-                                (this.state.markers == -1 ?
-                                    (<View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
-                                        <Image source={require('./img/nolocation.png')} style={{width: 100, height: 100, resizeMode: 'contain'}} />
-                                        <Text>{lg.alert.nolocation}</Text>
-                                    </View>) :
-                                    (this.state.markers == -2 ?
-                                        (<View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
-                                            <Image source={require('./img/nowifi.png')} style={{width: 100, height: 100, resizeMode: 'contain'}} />
-                                            <Text>{lg.alert.nointernet}</Text>
-                                        </View>) :
-                                        (this.state.markers.length == 0 && this.state.done.every(t => t) ?
-                                            (<View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
-                                                <Image source={require('./img/noresto.png')} style={{width: 100, height: 100, resizeMode: 'contain'}} />
-                                                <Text>{lg.alert.noresto}</Text>
-                                            </View>) :
-                                            (<FlatList
-                                                style={{ flex: 1, marginTop: 5 }}
-                                                data={this.state.markers}
-                                                renderItem={({ item }) => <Row item={item}/>}
-                                                updateCellsBatchingPeriod={100}
-                                            />)))) :
-                                (<Loading />))
-                        }
-                    </GooglePlacesAutocomplete>
-                </View>
-                {
-                    this.state.notif ?
-                        (<View style={{
-                            position: "absolute",
-                            top: 44,
-                            width: '100%',
-                            flex: 1,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: "#303030"
-                        }}>
-                            <Text style={{fontWeight: "bold", color: "white"}}>{this.state.notif}</Text>
-                        </View>) : <View/>}
-
-            </View>
-        );
-    }
-}
-
-// RESTO MAP
-class Resto2 extends React.Component {
-    static navigationOptions = {
-        headerTitle:
-            <Image
-                source={require('./img/png/img_htitle.png')}
-                style={{
-                    width: 110,
-                    height: 40,
-                    alignSelf: 'center',
-                    resizeMode: 'contain'
-                }} />,
-        headerStyle: {
-            backgroundColor: '#13a89e',
-        },
-        headerTintColor: '#fff',
-        headerRight:
-            <View/>
-    };
-
-    constructor(props) {
-        super(props);
-        this.state = {
-            markers: [], done: [false, false]
-        }
-    }
-
-    // Temporary query, used to revert the query on autocomplete search box when there is no connection during updateSchedule()
-    qT = query ? Object.assign({}, query) : null;
-
-    int = [0,0,0];
-
-    mount = true;
-
-    tog = true;
-
-    componentWillMount() {
-
-    }
-
-    componentDidMount() {
-        // If autocomplete search box is not empty, then set variable temporary query with it
-        this.qT = query ? Object.assign({}, query) : null;
-        this.checkInternet();
-    }
-
-    componentWillUnmount() {
-        this.clearInt();
-        this.mount = false;
-        menuopen2 = true;
-    }
-
-    clearInt(){
-        for (let i in this.int)
-            clearInterval(this.int[i]);
-        if (this.mount)
-            this.setState({done: [false, false],notif: null,loc: query});
-        // this.setState({done: [false, false]});
-        // this.setState({notif: null});
-        // this.setState({loc: query});
-    }
-
-    // Recheck for location permission whether there is a change
-    async checkPermission() {
-        // Check if the permission of location is not granted since Home screen (var resto.markers == -1)
-        let {status} = await Permissions.askAsync(Permissions.LOCATION);
-        // If the permission finally granted, get nearby restaurants
-        if (status == "granted") {
-            // Get current location
-            location = await Location.getCurrentPositionAsync({enableHighAccuracy:true});
-
-            // If there is no query assigned, set with default one (current location)
-            if (query == null)
-                query = {lat: location.coords.latitude, lng: location.coords.longitude, q: "Current location"};
-            if (this.mount)
-                this.setState({loc: query});
-            // Retrieve nearby restaurants
-            this.updateMarkers([query, {resto: true, qiblat: true}]);
-            // this.checkInternet(true);
-        }
-        // If the permission still not be granted, throw error message
-        else {
-            track("!! Resto: Tidak diberikan permission atas location");
-            Alert.alert(lg.alert.nolocation);
-            // UBAH KE SNACKBAR
-        }
-    }
-
-    checkInternet(update, fetching) {
-        // Temporary markers, used to revert back when there is no connection during updateMarkers() (the screen is showing last markers instead of empty data)
-        let temp = this.state.markers && this.state.markers.length > 0? this.state.markers.slice(0) : [];
-        // Refresh the value of this.state.markers and notif
-        this.clearInt();
-        // If need update, retrieve nearby restaurants
-        if (update)
-            getCountry(query.lat,query.lng).then(ctr => {
-                query.ctr = ctr;
-                updateResto(query);
-            });
-
-        let temp2 = this.state.markers.length;
-        let temp3 = null;
-        let temp4 = true;
-
-        this.int[0] = setInterval(()=>{
-            if (resto.done.every(v => v)) {
-                clearInterval(this.int[0]);
-                if (this.mount)
-                    this.setState({notif: null});
-            }
-            if (!this.state.notif)
-                if (this.mount)
-                    this.setState({notif: lg.notif.getloc});
-            let pos = !this.state.notif ? -1 : this.state.notif.indexOf("...");
-            if (pos!=-1) {
-                if (this.mount)
-                    this.setState({notif: this.state.notif.slice(0, pos)});
-            }
-            else {
-                if (this.mount)
-                    this.setState({notif: this.state.notif + "."});
-            }
-        },300);
-        this.int[1] = setInterval(() => {
-            if (query != temp3) {
-                if (this.mount)
-                    this.setState({notif: lg.notif.getkeywordresto, loc: query});
-                temp3 = query;
-                if (this.mount)
-                    this.map.animateToRegion(
-                        {
-                            latitude: query.lat,
-                            longitude: query.lng,
-                            latitudeDelta: 0.0922,
-                            longitudeDelta: 0.033,
-                        }, 500
-                    );
-            }
-            if (resto.markers == -1 && !update) {
-                clearInterval(this.int[1]);
-                clearInterval(this.int[0]);
-                if (this.mount)
-                    this.setState({notif: null,markers: resto.markers});
-                this.checkPermission();
-            }
-            else if (resto.markers == -2) {
-                if (!update) {
-                    clearInterval(this.int[1]);
-                    clearInterval(this.int[0]);
-                    if (this.mount)
-                        this.setState({notif: null,markers: resto.markers});
-                    this.updateMarkers([query, {resto: true, qiblat: true}]);
-                }
-                else {
-                    clearInterval(this.int[1]);
-                    clearInterval(this.int[0]);
-                    if (this.mount)
-                        this.setState({markers: resto.markers});
-                    // Revert back the markers (instead of showing empty marker)
-                    if (temp.length>0)
-                        resto = {markers: temp, done: [true, true]};
-                    else
-                        resto = {markers: -2, done: [false, false]};
-                    let intt = setInterval(()=>{
-                        if (query){
-                            clearInterval(intt);
-                            query = Object.assign({}, this.qT ? this.qT : query);
-                            if (this.mount)
-                                this.setState({markers: temp,loc: this.qT ? this.qT : query, notif: null});
-                            if (this.mount)
-                                this.map.fitToElements(true);
-                        }
-                    },10);
-
-                    // Revert back the pickers' selected value to previously
-                    Alert.alert(lg.alert.nointernet);
-                    // UBAH KE SNACKBAR
-                }
-            } else if (temp2 != resto.markers.length || resto.done.every(v => v)) {
-                if (this.mount)
-                    this.setState({markers: resto.markers});
-                if (resto.done.every(v => v)) {
-                    clearInterval(this.int[1]);
-                    clearInterval(this.int[0]);
-                    this.loc ? this.loc.showCallout() : null;
-                    if (this.mount)
-                        this.setState({notif: lg.notif.finishresto.replace(/{length}/g,resto.markers.length)});
-                    setTimeout(() => {
-                        if (this.mount)
-                            this.setState({notif: null});
-                    }, 2000);
-                    // Fetch other features' data as well
-                }
-                else if (resto.done[0]){
-                    if (this.mount)
-                        this.setState({notif: lg.notif.getpointresto});
-                }
-                else if (resto.done[1]){
-                    if (this.mount)
-                        this.setState({notif: lg.notif.getkeywordresto});
-                }
-                temp2 = resto.markers.length;
-                if (this.mount)
-                    this.map.fitToElements(true);
-                this.qT = Object.assign({}, query);
-                if (fetching && temp4) {
-                    temp4 = false;
-                    fetchData(fetching[0], fetching[1]);
-                }
-            }
-        }, 100);
-        // }
-    }
-
-    // Get new prayer time
-    updateMarkers(fetching){
-        // If the query is not Current location or Current location but location permission is granted
-        if (this.state.markers != -1 || (query != null && query.lat != 0 && query.q != "Current location")) {
-            // Wait for previous query assignment to be finished (from Home screen)
-            this.int[2] = setInterval(() => {
-                // If the var query is assigned
-                if (query) {
-                    // Clear the interval
-                    clearInterval(this.int[2]);
-                    // Retrieve the prayer time
-                    resto={markers: [], done: [false, false]};
-                    this.checkInternet(true, fetching);
-                }
-            }, 100);
-        }
-        else
-        // If the location permission is not granted
-            Alert.alert(lg.alert.nolocation);
-        // UBAH KE SNACKBAR
-
-    }
-
-
-    render() {
-        return (
-            <View style={{flex:1, backgroundColor: "#E9E9EF"}}>
-                <View style={{flex:1}}>
-                    <MapView
-                        provider="google"
-                        loadingEnabled={true}
-                        style={{flex:1}}
-                        ref={map => {this.map = map}}
-                        initialRegion={{
-                            latitude: query && query.lat ? query.lat : -6.904391,
-                            longitude: query && query.lng ? query.lng : 107.616946,
-                            latitudeDelta: 0.0922,
-                            longitudeDelta: 0.033,
-                        }}
-                        onPress={()=> {
-                            if (this.tog)
-                                if (this.mount)
-                                    this.setState({show: null});
-                        }}
-                    >
-                        { (this.state.loc && this.state.loc.lat) ?
-                            (<MapView.Marker
-                                ref={loc => this.loc = loc}
-                                key="loc"
-                                coordinate={{latitude: this.state.loc.lat, longitude: this.state.loc.lng}}
-                                title={this.state.loc.q}
-                                image={require('./img/png/img_mcurrent.png')}
-                            />) : (<View/>)
-                        }
-
-                        {this.state.markers && this.state.markers.length>1 ? this.state.markers.map(marker => (
-                            <MapView.Marker
-                                key={marker.key}
-                                coordinate={marker.coordinate}
-                                onPress={()=>{
-                                    this.tog = false
-                                    if (this.mount)
-                                        this.setState({show: marker.key});
-                                    setTimeout(()=>{this.tog = true},100);
-                                }}
-                                title={marker.text}
-                                description={lg.list.source+": "+marker.source}
-                                image={require('./img/png/img_mresto.png')}
-                            >
-                            </MapView.Marker>
-                        )):<View/>}
-
-                    </MapView>
-                </View>
-                {
-                    this.state.show != null ?
-                        (<View style={{
-                            position: "absolute",
-                            bottom: 0,
-                            width: '100%',
-                            flex: 1,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            alignSelf: 'center',
-                        }}>
-                            <View style={{
-                                // position: "absolute",
-                                padding: 10,
-                                margin: 10,
-                                height: 100,
-                                flex: 1,
-                                backgroundColor: "white",
-                                flexDirection: "row",
-                                alignSelf: 'center',
-                                borderRadius: 10,
-                                borderWidth: 1,
-                                borderColor: '#dadada',
-                            }}>
-                                <View style={{alignItems: 'center',
-                                    justifyContent: 'center',
-                                    overflow: 'hidden',
-                                    width: 100, height: 80, borderRadius: 5}}>
-                                    <Image style={{width: 100, height: 80, borderRadius: 5, resizeMode: this.state.markers[this.state.show].photo != restodef ? 'cover' : 'contain'}}
-                                           source={this.state.markers[this.state.show].photo == restodef ? require('./img/png/ic_resto.png') : {uri: this.state.markers[this.state.show].photo}} />
-                                </View>
-                                <View style={{marginLeft: 10, flexDirection: 'column', flex: 1}}>
-                                    <Text style={{fontWeight: "bold", fontSize: 14, color: "#686868"}}>{this.state.markers[this.state.show].text}</Text>
-                                    <Text style={{fontSize: 12, color: "#909090"}}>{lg.list.distance+": ~"+Math.round(this.state.markers[this.state.show].distance/100)/10 + lg.list.km}</Text>
-                                    <Text style={{fontSize: 12, color: "#909090"}}>{lg.list.source}: {this.state.markers[this.state.show].source}</Text>
-                                    <Text style={{fontWeight: 'normal', fontSize:12, color: this.state.markers[this.state.show].open ? '#13a89e' : '#909090'}}>{this.state.markers[this.state.show].open ? lg.list.open : this.state.markers[this.state.show].open === false ? lg.list.closed : lg.list.open_na}</Text>
-                                </View>
-                                <View style={{justifyContent: 'space-around'}}>
-                                    <View style={{flex:1, alignItems: 'flex-end', justifyContent: 'flex-start'}}>
-                                        <TouchableWithoutFeedback onPress={() => {
-                                            if (this.mount)
-                                                this.setState({show: null})}}>
-                                            <Image source={require('./img/close.png')} style={{width: 24, height: 24, resizeMode: 'contain'}} />
-                                        </TouchableWithoutFeedback>
-                                    </View>
-                                    <View style={{flex:1, alignItems: 'flex-end', justifyContent: 'flex-end'}}>
-                                        <TouchableWithoutFeedback onPress={() => {
-                                            track("Resto: Get direction from map to " + this.state.markers[this.state.show].text);
-                                            getDirections(this.state.markers[this.state.show].dir)}}>
-                                            <Image source={require('./img/direction.png')} style={{width: 24, height: 24, resizeMode: 'contain'}} />
-                                        </TouchableWithoutFeedback>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>) : <View/>}
-                {
-                    this.state.notif ?
-                        (<View style={{
-                            position: "absolute",
-                            top: 0,
-                            width: 360,
                             flex: 1,
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -3285,7 +3147,7 @@ class Resto2 extends React.Component {
 }
 
 // PRAYER TIME
-class Sholat extends React.Component {
+class Prayer extends React.Component {
     static navigationOptions = {
         headerTitle:
             <Image
@@ -3347,7 +3209,7 @@ class Sholat extends React.Component {
                     // Revert back the pickers' selected value to previously
                     if (this.tempT.length)
                         Alert.alert(lg.alert.nointernet);
-                    // UBAH KE SNACKBAR
+                    track("!! Home -> Prayer -> No internet connection");
                 }
                 else {
                     if (this.mount)
@@ -3390,10 +3252,9 @@ class Sholat extends React.Component {
         }
         // If the permission still not be granted, throw error message
         else {
-            track("!! Prayer: Tidak diberikan permission atas location");
             if (this.mount)
                 this.setState({data: -1});
-            // Alert.alert(lg.alert.nolocation);
+            track("!! Home -> Prayer -> No location permission");
         }
     }
 
@@ -3405,10 +3266,6 @@ class Sholat extends React.Component {
             this.place.setAddressText(query ? query.q : "Current location");
             this.place._onBlur();
         }
-
-        // If autocomplete search box is not empty, then set variable temporary query with it
-        // if (this.place.getAddressText() != "")
-        //     this.qT = this.place.getAddressText();
 
         // Wait for the prayer time to be retrieved
         this.int[1] = setInterval(() => {
@@ -3457,7 +3314,7 @@ class Sholat extends React.Component {
 
     getItemLayout = (data, index) => (
         { length: data.length, offset: 57 * index, index}
-    )
+    );
 
     // Get new prayer time
     updateSchedule(fetching){
@@ -3478,13 +3335,6 @@ class Sholat extends React.Component {
             }, 100);
         }
         else {
-            // If the location permission is not granted
-            // if (this.tempT.length) {
-            //     this.setState({data: this.tempT});
-            //     Alert.alert(lg.alert.nolocation);
-            //     // UBAH KE SNACKBAR
-            // }
-            // else
             if (this.mount)
                 this.setState({data: -1});
         }
@@ -3502,14 +3352,11 @@ class Sholat extends React.Component {
             if (Q) {
                 this.qT = Q.data.description;
                 query = {lat: Q.details.geometry.location.lat, lng: Q.details.geometry.location.lng, q: Q.data.description};
-                track("Prayer: Query for " + Q.data.description);
             }
 
             // Retrieve for new prayer time
             this.updateSchedule([query, {prayer: true, qiblat: true}]);
-            track("Prayer: Month " + prayer.time.month + " year " + prayer.time.year);
         }).catch(err => {
-            console.log(err.message);
             // If there is no internet connection, revert back the autocomplete search box to previous value
             this.place.setAddressText(this.qT);
             this.place._handleChangeText(this.qT);
@@ -3519,7 +3366,7 @@ class Sholat extends React.Component {
             if (this.mount)
                 this.setState({data: this.tempT});
             Alert.alert(lg.alert.nointernet);
-            // UBAH KE SNACKBAR
+            track('!! Home -> Prayer -> No internet connection')
         })
     }
 
@@ -3544,6 +3391,7 @@ class Sholat extends React.Component {
                             fetchDetails={true}
                             onPress={(data, details = null) => {
                                 this.preUpdate({data: data, details: details});
+                                track("Home -> Prayer -> Query: " + data.description);
                             }}
                             query={{
                                 key: keyMap,
@@ -3575,11 +3423,11 @@ class Sholat extends React.Component {
                             renderRightButton={() =>
                                 <TouchableWithoutFeedback
                                     onPress={() => {
-                                        track("Mosque: Clear query");
                                         this.qT = this.place.getAddressText();
                                         this.place.setAddressText("");
                                         this.place._handleChangeText("");
                                         this.place.triggerFocus()
+                                        track("Home -> Prayer -> Clear Query");
                                     }}>
                                     <View
                                         style={{
@@ -3602,7 +3450,7 @@ class Sholat extends React.Component {
                             <View style={{flex: 1}}>
                                 <View>
                                     {
-                                        (Platform.OS === 'android') ?
+                                        (Platform.OS == 'android') ?
                                             <View style={{flexDirection: "row", width: '70%', alignSelf: 'flex-end', alignItems: 'center', justifyContent: 'center', backgroundColor:'white', paddingHorizontal: 10, borderRadius: 20}}>
                                                 <Image source={require('./img/png/ic_jadwal.png')} style={{width: 24, height: 24, marginHorizontal: 10, resizeMode: 'contain'}} />
                                                 <Picker
@@ -3615,7 +3463,7 @@ class Sholat extends React.Component {
                                                             this.setState({month: value});
                                                         // Retrieve new prayer time
                                                         this.preUpdate();
-                                                        track("Prayer: Change month to " + value);
+                                                        track("Home -> Prayer -> Month: " + value);
                                                     }}>
                                                     <Picker.Item label={lg.prayer.jan} value={1}/>
                                                     <Picker.Item label={lg.prayer.feb} value={2}/>
@@ -3639,7 +3487,7 @@ class Sholat extends React.Component {
                                                             this.setState({year: value});
                                                         // Retrieve new prayer time
                                                         this.preUpdate();
-                                                        track("Prayer: Change year to " + value);
+                                                        track("Home -> Prayer -> Year: " + value);
                                                     }}>
                                                     <Picker.Item label="2018" value={2018}/>
                                                     <Picker.Item label="2019" value={2019}/>
@@ -3650,6 +3498,7 @@ class Sholat extends React.Component {
                                             </View> :
                                             <TouchableWithoutFeedback onPress={()=>{
                                                 this.setState({month2: this.state.month, year2: this.state.year, show: true});
+                                                track("Home -> Prayer -> Show Date Picker (iOS)");
                                             }}>
                                                 <View style={{flexDirection: "row", alignSelf: 'flex-end', alignItems: 'center', justifyContent: 'center',
                                                     backgroundColor:'white', paddingHorizontal: 10, paddingVertical:10, borderRadius: 20}}>
@@ -3692,9 +3541,9 @@ class Sholat extends React.Component {
                                                     ref={(ref) => {this.flat = ref}}
                                                     style={{flex: 1}}
                                                     data={this.state.data}
-                                                    renderItem={({item}) => <Row2 tgl={item.tgl} sbh={item.sbh}
-                                                                                  dhr={item.dhr} asr={item.asr}
-                                                                                  mgr={item.mgr} isy={item.isy}/>}
+                                                    renderItem={({item}) => <PrayerItem tgl={item.tgl} sbh={item.sbh}
+                                                                                        dhr={item.dhr} asr={item.asr}
+                                                                                        mgr={item.mgr} isy={item.isy}/>}
                                                     updateCellsBatchingPeriod={100}
                                                     getItemLayout={this.getItemLayout}
                                                 />
@@ -3719,7 +3568,10 @@ class Sholat extends React.Component {
                             opacity: 0.7,
                             flex: 1,
                             backgroundColor: 'black'}}>
-                            <TouchableWithoutFeedback style={{flex:1}} onPress={()=>{this.setState({show: false})}}>
+                            <TouchableWithoutFeedback style={{flex:1}} onPress={()=>{
+                                this.setState({show: false});
+                                track("Home -> Prayer -> Date Picker (iOS) -> Close");
+                            }}>
                                 <View style={{
                                     flex: 1,
                                     alignItems: 'center',
@@ -3747,7 +3599,7 @@ class Sholat extends React.Component {
                                                 if (this.mount)
                                                     this.setState({month2: value});
                                                 // Retrieve new prayer time
-                                                track("Prayer: Change month to " + value);
+                                                track("Home -> Prayer -> Date Picker (iOS) -> Month: " + value);
                                             }}>
                                             <Picker.Item label={lg.prayer.jan} value={1}/>
                                             <Picker.Item label={lg.prayer.feb} value={2}/>
@@ -3770,7 +3622,7 @@ class Sholat extends React.Component {
                                                 if (this.mount)
                                                     this.setState({year2: value});
                                                 // Retrieve new prayer time
-                                                track("Prayer: Change year to " + value);
+                                                track("Home -> Prayer -> Date Picker (iOS) -> Year: " + value);
                                             }}>
                                             <Picker.Item label="2018" value={2018}/>
                                             <Picker.Item label="2019" value={2019}/>
@@ -3783,6 +3635,7 @@ class Sholat extends React.Component {
                                         onPress={() => {
                                             this.setState({month: this.state.month2, year: this.state.year2, show: false});
                                             this.preUpdate();
+                                            track("Home -> Prayer -> Date Picker (iOS) -> Value " + this.state.month2 + "/" + this.state.year2);
                                         }}>
                                         <View style={{backgroundColor: '#13a89e', height: 50, paddingHorizontal: 10, borderRadius: 5,
                                             justifyContent: 'center', alignItems: 'center', marginHorizontal: 20, marginBottom: 20}}>
@@ -3798,8 +3651,100 @@ class Sholat extends React.Component {
     }
 }
 
+// PRAYER TIME COMPONENT
+class PrayerItem extends React.PureComponent {
+    render () {
+        // Check if the current item list matches with current date for formatting
+        let match = new Date().getDate() == this.props.tgl && new Date().getMonth()+1 == prayer.time.month && new Date().getFullYear() == prayer.time.year;
+        return (
+            <View style={{paddingVertical: 10, paddingLeft: 10, borderBottomColor: '#dadada',borderBottomWidth: 1,
+                backgroundColor: match ? "#13a89e" : this.props.tgl % 2 == 0 ? "rgba(19,168,158, 0.2)" : "white"}}>
+                <View style={{flexDirection:"row", alignItems: 'center', justifyContent:'center'}}>
+                    <Text style={{flex:10, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.tgl}</Text>
+                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.sbh.replace(' ','\n')}</Text>
+                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.dhr.replace(' ','\n')}</Text>
+                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.asr.replace(' ','\n')}</Text>
+                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.mgr.replace(' ','\n')}</Text>
+                    <Text style={{flex:15, color: match ? "#F7F9F4" : "#10120D", textAlign: 'center'}}>{this.props.isy.replace(' ','\n')}</Text>
+                </View>
+            </View>
+        )
+    }
+}
+
+// TRIP
+class Trip extends React.Component {
+    static navigationOptions = {
+        headerTitle:
+            <Image
+                source={require('./img/png/img_htitle.png')}
+                style={{
+                    width: 110,
+                    height: 40,
+                    alignSelf: 'center',
+                    resizeMode: 'contain'
+                }} />,
+        headerStyle: {
+            backgroundColor: '#13a89e',
+        },
+        headerTintColor: '#fff',
+        headerRight:
+            <TouchableWithoutFeedback
+                onPress={() => {
+                    Linking.openURL(trip_url)
+                    track('Home -> Trip -> Web Browser');
+                }}>
+                <View>
+                    <Image
+                        source={require('./img/png/ic_web.png')}
+                        style={{
+                            width: 24,
+                            height: 24,
+                            alignSelf: 'center',
+                            resizeMode: 'contain',
+                            margin: 20
+                        }} />
+                </View>
+            </TouchableWithoutFeedback>
+    };
+
+    constructor(props) {
+        super(props);
+        this.state = {done: 0}
+    }
+
+    async componentWillMount(){
+        await fetch(trip_url).then(()=>{
+            this.setState({done: 1});
+        }).catch(err => {
+            this.setState({done: -1});
+            track("!! Home -> Trip -> Fetch website: " + err.message);
+        });
+    }
+
+    componentWillUnmount() {
+        menuopen = true;
+    }
+
+    render() {
+        return (
+
+            (this.state.done == 1 ?
+                <WebView
+                    source={{uri: trip_url}}
+                /> : (this.state.done == -1 ? <View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
+                    <Image source={require('./img/nowifi.png')} style={{width: 40, height: 40, resizeMode: 'contain'}} />
+                    <Text>{lg.alert.nointernet}</Text>
+                </View> :
+                    <View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
+                        <Loading />
+                    </View>))
+        );
+    }
+}
+
 // QIBLA
-class Qiblat extends React.Component {
+class Qibla extends React.Component {
     static navigationOptions = {
         headerTitle:
             <Image
@@ -3860,9 +3805,9 @@ class Qiblat extends React.Component {
         }
         // If the permission still not be granted, throw error message
         else {
-            track("!! Qiblat: Tidak diberikan permission atas location");
             if (this.mount)
                 this.setState({noloc: true});
+            track("!! Home -> Qibla -> No location permission");
         }
     }
 
@@ -3917,7 +3862,7 @@ class Qiblat extends React.Component {
         return (
             <View style={styles.container3}>
                 {err ? text :
-                    <View style={styles.container3}><Compass degree={this.state.qiblat}/><Text style={{textAlign: 'center'}}>{lg.qibla.degree}: {this.state.qiblat}°</Text><Text style={{textAlign: 'center'}}>{"\n\n"+lg.alert.offelectronic
+                    <View style={styles.container3}><QiblaCompass degree={this.state.qiblat}/><Text style={{textAlign: 'center'}}>{lg.qibla.degree}: {this.state.qiblat}°</Text><Text style={{textAlign: 'center'}}>{"\n\n"+lg.alert.offelectronic
                     // Show GPS warning if GPS is off
                     +this.state.gps
                     }</Text>
@@ -3927,8 +3872,46 @@ class Qiblat extends React.Component {
     }
 }
 
+// QIBLA COMPASS
+class QiblaCompass extends React.Component {
+    constructor() {
+        super();
+        this.state = { heading: new Animated.Value(0), accuracy: 0 };
+
+        this.onRotateDebounced = debounce(this.onRotate, 100);
+    }
+
+    onRotate(heading) {
+        Animated.timing(this.state.heading, {
+            toValue: 360 - heading + this.props.degree,
+            duration: 170,
+        }).start();
+    }
+
+    componentWillMount() {
+        if (!locationWatcher) {
+            locationWatcher = Location.watchHeadingAsync(({ magHeading, trueHeading, accuracy }) => {
+                this.onRotateDebounced(trueHeading || magHeading);
+            });
+            track("Home -> Qibla -> Degree: " + this.props.degree + "°")
+        }
+    }
+
+    render() {
+        let rotationAmount = this.state.heading.interpolate({
+            inputRange: [0, 360],
+            outputRange: ['0deg', '360deg'],
+        });
+        return(<Animated.View
+            style={{transform: [{ rotate: rotationAmount }]}}>
+            <Image style={{ width: 200, height: 200 }}
+                   source={require('./img/png/img_compass.png')}/>
+        </Animated.View>);
+    }
+}
+
 // INFO
-class Info extends React.Component {
+class Tips extends React.Component {
     static navigationOptions = {
         headerTitle:
             <Image
@@ -3945,7 +3928,10 @@ class Info extends React.Component {
         headerTintColor: '#fff',
         headerRight:
             <TouchableWithoutFeedback
-                onPress={() => Linking.openURL(media_url)}>
+                onPress={() => {
+                    Linking.openURL(media_url)
+                    track("Home -> Tips -> Web Browser");
+                }}>
                 <View>
                     <Image
                         source={require('./img/png/ic_web.png')}
@@ -3968,7 +3954,10 @@ class Info extends React.Component {
     async componentWillMount(){
         await fetch(media_url).then(()=>{
             this.setState({done: 1});
-        }).catch(err => {track("!! Media => check website: " + err.message); this.setState({done: -1});});
+        }).catch(err => {
+            this.setState({done: -1});
+            track("!! Home -> Tips -> Fetch website: " + err.message);
+        });
     }
 
     componentWillUnmount() {
@@ -3993,7 +3982,7 @@ class Info extends React.Component {
 }
 
 // FEEDBACK
-class Feed extends React.Component {
+class Feedback extends React.Component {
     static navigationOptions = {
         headerTitle:
             <Image
@@ -4020,7 +4009,10 @@ class Feed extends React.Component {
     async componentWillMount(){
         await fetch(feed_url).then(()=>{
             this.setState({done: 1});
-        }).catch(err => {track("!! Feed => check website: " + err.message); this.setState({done: -1});});
+        }).catch(err => {
+            this.setState({done: -1});
+            track("!! Home -> Feedback -> Fetch website: " + err.message);
+        });
     }
 
     componentWillUnmount() {
@@ -4028,53 +4020,47 @@ class Feed extends React.Component {
     }
 
     render() {
-        return (
-
-            (this.state.done == 1 ?
-                <WebView
-                    source={{uri: feed_url}}
-                /> : (this.state.done == -1 ? <View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
-                    <Image source={require('./img/nowifi.png')} style={{width: 100, height: 100, resizeMode: 'contain'}} />
-                    <Text>{lg.alert.nointernet}</Text>
-                </View> :
-                    <View style={{backgroundColor:'#E9E9EF', flex:1, alignItems:'center', justifyContent:'center'}}>
-                        <Loading />
-                    </View>))
-        );
+        return this.state.done == 1 ? <WebView
+            source={{uri: feed_url}}
+        /> : this.state.done == -1 ?
+            <View style={{backgroundColor: '#E9E9EF', flex: 1, alignItems: 'center', justifyContent: 'center'}}>
+                <Image source={require('./img/nowifi.png')} style={{width: 100, height: 100, resizeMode: 'contain'}}/>
+                <Text>{lg.alert.nointernet}</Text>
+            </View> :
+            <View style={{backgroundColor: '#E9E9EF', flex: 1, alignItems: 'center', justifyContent: 'center'}}>
+                <Loading />
+            </View>;
     }
 }
 
 // STACK NAVIGATOR
 export default StackNavigator({
-    // Start: {
-    //     screen: Start,
-    // },
     Home: {
-        screen: App,
+        screen: Home,
     },
+    RestoList: {
+        screen: RestoList,
+    },
+    RestoMap: {
+        screen: RestoMap,
+    },
+    Mosque: {
+        screen: Mosque,
+    },
+    Prayer: {
+        screen: Prayer,
+    } ,
     Trip: {
         screen: Trip,
     },
-    Masjid: {
-        screen: Masjid,
+    Qibla: {
+        screen: Qibla,
     },
-    Qiblat: {
-        screen: Qiblat,
+    Tips: {
+        screen: Tips
     },
-    Resto: {
-        screen: Resto,
-    },
-    Resto2: {
-        screen: Resto2,
-    },
-    Info: {
-        screen: Info
-    },
-    Sholat: {
-        screen: Sholat,
-    } ,
-    Feed: {
-        screen: Feed
+    Feedback: {
+        screen: Feedback
     }
 }, {
     cardStyle: {
