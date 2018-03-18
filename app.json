@@ -15,11 +15,9 @@
     "ios": {
       "bundleIdentifier": "com.halallocal.app",
       "buildNumber": "4.1.0",
-      "icon": "./img/pn/ic_launcher_ios.png",
+      "icon": "./img/png/ic_launcher_ios.png",
       "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyDhpUU6ghWOUsSpIkuSgPb-ov7ATjKP-2Q"
-        }
+        "googleMapsApiKey": "AIzaSyDhpUU6ghWOUsSpIkuSgPb-ov7ATjKP-2Q"
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app uses your location to find nearby halal places and qibla."
@@ -39,10 +37,6 @@
     "splash": {
       "image": "./img/png/splash.png",
       "backgroundColor": "#13A89E"
-    },
-    "assetBundlePatterns": [
-      "img/png/*",
-      "lang/*"
-    ]
+    }
   }
 }
