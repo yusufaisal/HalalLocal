@@ -1,18 +1,35 @@
 {
   "expo": {
     "name": "Halal Local",
-    "icon": "./img/jpg/ic_launcher.png",
-    "version": "4.0.0",
+    "description": "Halal Local - Halal Trip, Food, Mosque, Salat, Qibla",
     "slug": "halallocal",
     "sdkVersion": "23.0.0",
+    "version": "4.1.0",
     "orientation": "portrait",
+    "primaryColor": "#13A89E",
+    "icon": "./img/png/ic_launcher.png",
+    "androidStatusBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "#00796B"
+    },
     "ios": {
-      "bundleIdentifier": "com.halallocal.app"
+      "bundleIdentifier": "com.halallocal.app",
+      "buildNumber": "4.1.0",
+      "icon": "./img/pn/ic_launcher_ios.png",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDhpUU6ghWOUsSpIkuSgPb-ov7ATjKP-2Q"
+        }
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to find nearby halal places and qibla."
+      }
     },
     "android": {
       "package": "com.halallocal.app",
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "READ_EXTERNAL_STORAGE", "READ_INTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"],
       "versionCode": 5,
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.halallocal.app",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "READ_EXTERNAL_STORAGE", "READ_INTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"],
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyDhpUU6ghWOUsSpIkuSgPb-ov7ATjKP-2Q"
@@ -22,6 +39,10 @@
     "splash": {
       "image": "./img/png/splash.png",
       "backgroundColor": "#13A89E"
-    }
+    },
+    "assetBundlePatterns": [
+      "img/png/*",
+      "lang/*"
+    ]
   }
 }
